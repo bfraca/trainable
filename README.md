@@ -1,4 +1,8 @@
-# Trainable v2
+<p align="center">
+  <img src="frontend/public/logo-with-text.png" alt="Trainable" height="60">
+</p>
+
+# Trainable
 
 AI-powered ML experimentation platform. Upload a dataset, and AI agents autonomously perform EDA, data preparation, and model training — with real-time streaming visualization.
 

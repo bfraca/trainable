@@ -4,7 +4,7 @@
 
 ## System Overview
 
-Trainable v2 is a three-tier application: a Next.js frontend, a FastAPI backend, and Modal sandboxes for isolated code execution. An AI agent (Claude) drives the ML workflow autonomously while the user observes via real-time streaming.
+Trainable is a three-tier application: a Next.js frontend, a FastAPI backend, and Modal sandboxes for isolated code execution. An AI agent (Claude) drives the ML workflow autonomously while the user observes via real-time streaming.
 
 ```
 ┌─────────────────┐  REST/JSON  ┌──────────────────────┐  Modal SDK   ┌──────────────────┐
