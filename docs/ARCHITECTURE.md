@@ -6,25 +6,35 @@
 
 Trainable v2 is a three-tier application: a Next.js frontend, a FastAPI backend, and Modal sandboxes for isolated code execution. An AI agent (Claude) drives the ML workflow autonomously while the user observes via real-time streaming.
 
-```
-┌─────────────────┐  REST/JSON  ┌──────────────────────┐  Modal SDK   ┌──────────────────┐
-│    Frontend      │ ──────────► │      Backend         │ ───────────► │   Modal.com      │
-│    Next.js 14    │             │      FastAPI         │              │   Sandbox        │
-│                  │  SSE stream │                      │  stdout/err  │   (Python 3.11)  │
-│  Gallery         │ ◄────────── │  Routers             │ ◄─────────── │                  │
-│  Studio          │             │  Services            │              │  Volume: /data   │
-│  ChatPanel       │             │  Agent orchestration │              │  GPU: optional   │
-│  CanvasPanel     │             │                      │              │  timeout: 600s   │
-└─────────────────┘             └──────────┬───────────┘              └──────────────────┘
-                                           │            Agent SDK
-                                           │ ◄──────────────────────► Claude API
-                                           │                          (claude-opus-4-6)
-                                    ┌──────┴──────┐
-                                    │             │
-                               ┌────▼────┐  ┌────▼────┐
-                               │ SQLite/ │  │ S3/MinIO│
-                               │ Postgres│  │ (Boto3) │
-                               └─────────┘  └─────────┘
+```mermaid
+graph LR
+    subgraph Frontend["Frontend (Next.js 14)"]
+        Gallery
+        Studio
+        ChatPanel
+        CanvasPanel
+    end
+
+    subgraph Backend["Backend (FastAPI)"]
+        Routers
+        Services
+        Agent["Agent orchestration"]
+    end
+
+    subgraph Modal["Modal.com Sandbox"]
+        Python["Python 3.11"]
+        Volume["Volume: /data"]
+        GPU["GPU: optional"]
+        Timeout["timeout: 600s"]
+    end
+
+    Frontend -- "REST/JSON" --> Backend
+    Backend -- "SSE stream" --> Frontend
+    Backend -- "Modal SDK" --> Modal
+    Modal -- "stdout/err" --> Backend
+    Backend <-- "Agent SDK" --> Claude["Claude API (claude-opus-4-6)"]
+    Backend --> DB["SQLite / PostgreSQL"]
+    Backend --> S3["S3 / MinIO (Boto3)"]
 ```
 
 ## Tech Stack
@@ -45,34 +55,76 @@ Trainable v2 is a three-tier application: a Next.js frontend, a FastAPI backend,
 
 Six tables managed by async SQLAlchemy ORM (`backend/models.py`):
 
-```
-┌──────────────────┐       ┌──────────────────────┐
-│   experiments     │       │      sessions         │
-├──────────────────┤       ├──────────────────────┤
-│ id         PK    │──1:N──│ id              PK    │
-│ name             │       │ experiment_id   FK    │
-│ description      │       │ state (enum)          │
-│ dataset_ref      │       │ created_at            │
-│ instructions     │       │ updated_at            │
-│ created_at       │       └──────────┬───────────┘
-└──────────────────┘                  │
-                                      │ 1:N
-                         ┌────────────┼────────────┬────────────────┐
-                         ▼            ▼            ▼                ▼
-                  ┌─────────────┐ ┌──────────┐ ┌──────────┐ ┌─────────────────────┐
-                  │  messages    │ │ artifacts│ │ metrics  │ │processed_dataset_meta│
-                  ├─────────────┤ ├──────────┤ ├──────────┤ ├─────────────────────┤
-                  │ id       PK │ │ id    PK │ │ id    PK │ │ id              PK  │
-                  │ session_id  │ │ session  │ │ session  │ │ session_id      FK  │
-                  │ role        │ │ stage    │ │ stage    │ │ experiment_id   FK  │
-                  │ content     │ │ type     │ │ step     │ │ columns       JSON  │
-                  │ metadata  J │ │ name     │ │ name     │ │ feature_columns     │
-                  │ created_at  │ │ path     │ │ value    │ │ target_column       │
-                  └─────────────┘ │ s3_path  │ │ run_tag  │ │ total/train/val/    │
-                                  │ metadata │ │ created  │ │   test_rows         │
-                                  └──────────┘ └──────────┘ │ quality_stats JSON  │
-                                                            │ s3_synced           │
-                                                            └─────────────────────┘
+```mermaid
+erDiagram
+    experiments ||--o{ sessions : "1:N"
+    sessions ||--o{ messages : "1:N"
+    sessions ||--o{ artifacts : "1:N"
+    sessions ||--o{ metrics : "1:N"
+    sessions ||--o| processed_dataset_meta : "1:1"
+
+    experiments {
+        UUID id PK
+        string name
+        string description
+        string dataset_ref
+        text instructions
+        datetime created_at
+    }
+
+    sessions {
+        UUID id PK
+        UUID experiment_id FK
+        enum state
+        datetime created_at
+        datetime updated_at
+    }
+
+    messages {
+        UUID id PK
+        UUID session_id FK
+        string role
+        text content
+        JSON metadata
+        datetime created_at
+    }
+
+    artifacts {
+        UUID id PK
+        UUID session_id FK
+        string stage
+        string type
+        string name
+        string path
+        string s3_path
+        JSON metadata
+    }
+
+    metrics {
+        UUID id PK
+        UUID session_id FK
+        string stage
+        int step
+        string name
+        float value
+        string run_tag
+        datetime created_at
+    }
+
+    processed_dataset_meta {
+        UUID id PK
+        UUID session_id FK
+        UUID experiment_id FK
+        JSON columns
+        string feature_columns
+        string target_column
+        int total_rows
+        int train_rows
+        int val_rows
+        int test_rows
+        JSON quality_stats
+        bool s3_synced
+    }
 ```
 
 ### Table Details
@@ -112,73 +164,56 @@ Six tables managed by async SQLAlchemy ORM (`backend/models.py`):
 
 The full execution path from user click to sandbox execution:
 
-```
-User clicks "Start EDA"
-│
-├─► POST /api/sessions/{id}/stages/eda/start         [routers/sessions.py]
-│     1. Validate prerequisites (state must be 'created')
-│     2. Update session.state → 'eda_running'
-│     3. asyncio.create_task(_run_agent())            ← background task
-│     4. Return {"status": "started"} immediately
-│
-├─► run_agent()                                        [services/agent.py]
-│     1. Load previous stage report (prep reads EDA, train reads prep)
-│     2. Build system prompt from STAGE_PROMPTS[stage]
-│       - Injects: experiment_id, session_id, instructions, prev_context
-│     3. Create per-call MCP server with bound execute_code handler
-│     4. Initialize ClaudeAgentOptions:
-│       - model: claude-opus-4-6
-│       - max_turns: 30
-│       - tools: [mcp__trainable__execute_code]
-│       - permission_mode: bypassPermissions
-│     5. Start agent loop: async for message in query(prompt, options)
-│
-├─► Claude decides to call execute_code                [agent SDK loop]
-│     Agent generates Python code and invokes the MCP tool
-│
-├─► execute_code handler                               [services/agent.py]
-│     1. Publish 'tool_start' SSE event
-│     2. Auto-save code as /sessions/{id}/{stage}/scripts/step_01_*.py
-│     3. Call sandbox.run_code(code, session_id, stage, gpu)
-│
-├─► run_code()                                         [services/sandbox.py]
-│     1. Prepend _SDK_PREAMBLE to code
-│       - Injects `trainable` module with log() and configure_dashboard()
-│     2. modal.Sandbox.create.aio(
-│           "python", "-u", "-c", full_code,
-│           image   = debian-slim + pandas/sklearn/xgb/torch/tf/...,
-│           volumes = {"/data": trainable-data volume},
-│           gpu     = None | "T4" | "A10G" | ...,
-│           timeout = 600,                             ← 10 min per execution
-│           app     = modal.App.lookup("trainable")
-│        )
-│     3. Stream stdout chunks:
-│       - Publish 'code_output' SSE events in real-time
-│       - Parse JSON lines for metrics (services/metrics.py)
-│       - If metric found → persist to DB + publish 'metrics_batch' SSE
-│       - If chart_config found → publish 'chart_config' SSE
-│     4. Drain stderr concurrently (asyncio.create_task)
-│     5. Return {"stdout", "stderr", "returncode"}
-│
-├─► Back in execute_code handler
-│     1. Detect new files on Modal Volume
-│     2. Publish 'file_created' SSE events for each new file
-│     3. Publish 'tool_end' SSE event with output
-│     4. Return output to Claude agent
-│
-├─► Claude agent loop continues
-│     Agent reads output, decides to write more code or finish
-│     (repeats up to 30 turns)
-│
-├─► Agent finishes
-│     1. _publish_artifacts(): read report.md + list all files from volume
-│     2. _post_stage_hook():
-│       - Validator: check required outputs exist (prep: splits; train: model)
-│       - S3 sync: upload stage workspace to S3 bucket
-│       - Metadata extractor (prep only): parse columns, splits, quality
-│     3. Update session.state → 'eda_done'
-│
-└─► SSE delivers all events to frontend in real-time
+```mermaid
+sequenceDiagram
+    actor User
+    participant FE as Frontend
+    participant API as Backend (FastAPI)
+    participant Agent as Agent (Claude SDK)
+    participant Claude as Claude API
+    participant Sandbox as Modal Sandbox
+    participant Vol as Modal Volume
+    participant DB as Database
+    participant S3 as S3 / MinIO
+
+    User->>FE: Click "Start EDA"
+    FE->>API: POST /api/sessions/{id}/stages/eda/start
+    Note over API: Validate state, set → eda_running
+    API-->>FE: {"status": "started"}
+    API->>Agent: asyncio.create_task(run_agent())
+
+    Note over Agent: Build system prompt, create MCP server
+    Agent->>Claude: query(prompt, options)
+
+    loop Up to 30 turns
+        Claude->>Agent: execute_code(python_code)
+        Agent-->>FE: SSE: tool_start
+        Agent->>Sandbox: sandbox.run_code(code)
+        Note over Sandbox: Prepend SDK preamble, create container
+        Sandbox->>Vol: Read/write /data
+
+        loop Stream stdout chunks
+            Sandbox-->>Agent: stdout chunk
+            Agent-->>FE: SSE: code_output
+            Agent->>DB: Persist metrics (if found)
+            Agent-->>FE: SSE: metrics_batch / chart_config
+        end
+
+        Sandbox-->>Agent: {stdout, stderr, returncode}
+        Agent->>Vol: Detect new files
+        Agent-->>FE: SSE: file_created
+        Agent-->>FE: SSE: tool_end
+        Agent-->>Claude: Tool output
+        Note over Claude: Decide: write more code or finish
+    end
+
+    Note over Agent: Agent finishes
+    Agent->>Vol: Read report.md + list files
+    Agent-->>FE: SSE: report_ready, files_ready
+    Agent->>DB: Validate outputs (splits/model)
+    Agent->>S3: Sync stage artifacts
+    Agent->>DB: Update state → eda_done
+    Agent-->>FE: SSE: state_change
 ```
 
 ### Modal Volume Structure
@@ -331,12 +366,20 @@ See [agents.md](agents.md) for detailed agent documentation.
 
 ## Session State Machine
 
-```
-created → eda_running → eda_done → prep_running → prep_done → train_running → train_done
-                ↓                        ↓                          ↓
-             failed                   failed                     failed
-                ↓                        ↓                          ↓
-            cancelled                cancelled                  cancelled
+```mermaid
+stateDiagram-v2
+    [*] --> created
+    created --> eda_running
+    eda_running --> eda_done
+    eda_running --> failed
+    eda_done --> prep_running
+    prep_running --> prep_done
+    prep_running --> failed
+    prep_done --> train_running
+    train_running --> train_done
+    train_running --> failed
+    failed --> cancelled
+    train_done --> [*]
 ```
 
 Each stage requires the previous one to complete. The backend enforces this in `sessions.py:start_stage()`.
