@@ -1,0 +1,121 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --foreground-rgb: 255, 255, 255;
+  --background-rgb: 0, 0, 0;
+  --surface-rgb: 17, 17, 17;
+  --surface-elevated-rgb: 26, 26, 26;
+  --border-rgb: 38, 38, 38;
+  --text-secondary-rgb: 163, 163, 163;
+}
+
+body {
+  color: rgb(var(--foreground-rgb));
+  background-color: rgb(var(--background-rgb));
+}
+
+/* Focus-visible styles for keyboard accessibility */
+@layer base {
+  *:focus-visible {
+    @apply outline-none ring-2 ring-primary-500 ring-offset-2 ring-offset-black;
+  }
+  button:focus-visible,
+  a:focus-visible,
+  [role='button']:focus-visible {
+    @apply outline-none ring-2 ring-primary-500 ring-offset-2 ring-offset-black rounded;
+  }
+  input:focus-visible,
+  textarea:focus-visible,
+  select:focus-visible {
+    @apply ring-0 ring-offset-0;
+  }
+}
+
+@layer utilities {
+  .transition-page {
+    @apply transition-all duration-300 ease-in-out;
+  }
+  .transition-fast {
+    @apply transition-all duration-150 ease-in-out;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+/* Custom scrollbar - dark theme */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #111;
+}
+::-webkit-scrollbar-thumb {
+  background: #333;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #444;
+}
+
+/* Markdown styles - dark theme */
+.markdown-content h1 {
+  @apply text-2xl font-bold mt-6 mb-4 text-white;
+}
+.markdown-content h2 {
+  @apply text-xl font-semibold mt-5 mb-3 text-white;
+}
+.markdown-content h3 {
+  @apply text-lg font-medium mt-4 mb-2 text-white;
+}
+.markdown-content p {
+  @apply my-3 leading-relaxed text-gray-300;
+}
+.markdown-content ul {
+  @apply list-disc list-inside my-3 text-gray-300;
+}
+.markdown-content ol {
+  @apply list-decimal list-inside my-3 text-gray-300;
+}
+.markdown-content code {
+  @apply bg-neutral-800 text-gray-200 px-1 py-0.5 rounded text-sm font-mono;
+}
+.markdown-content pre {
+  @apply bg-neutral-900 text-gray-100 p-4 rounded-lg overflow-x-auto my-4 border border-neutral-800;
+}
+.markdown-content pre code {
+  @apply bg-transparent p-0;
+}
+.markdown-content img {
+  @apply max-w-full h-auto my-4 rounded-lg shadow-md;
+}
+.markdown-content table {
+  @apply w-full border-collapse my-4 text-sm rounded-lg overflow-hidden;
+}
+.markdown-content thead {
+  @apply bg-neutral-800;
+}
+.markdown-content th {
+  @apply border border-neutral-600 px-4 py-2.5 text-left text-white font-semibold text-xs uppercase tracking-wider;
+}
+.markdown-content td {
+  @apply border border-neutral-700 px-4 py-2 text-left text-gray-300;
+}
+.markdown-content tbody tr:hover {
+  @apply bg-neutral-800/50;
+}
+.markdown-content tbody tr:nth-child(even) {
+  @apply bg-neutral-800/30;
+}
+.markdown-content blockquote {
+  @apply border-l-4 border-primary-500 pl-4 my-4 italic text-gray-400;
+}

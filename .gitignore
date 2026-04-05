@@ -1,0 +1,52 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+*.db
+
+# Node
+node_modules/
+.next/
+out/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Modal
+.modal/
+
+# Logs
+*.log
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Secrets / certificates
+*.pem
+*.key
+*.crt
+credentials.*
+
+# Ruff
+.ruff_cache/
+
+# Build artifacts
+dist/
+build/
+src/trainable/static/
+!src/trainable/static/.gitkeep
