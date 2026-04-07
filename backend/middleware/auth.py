@@ -9,6 +9,7 @@ behaves exactly as before (open access).  This keeps the local-dev
 experience frictionless while protecting deployed instances.
 """
 
+import hmac
 import logging
 
 from fastapi import Request
@@ -47,7 +48,7 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
         else:
             token = ""
 
-        if token != settings.api_key:
+        if not hmac.compare_digest(token, settings.api_key):
             logger.warning(
                 "Rejected unauthenticated request: %s %s",
                 request.method,
