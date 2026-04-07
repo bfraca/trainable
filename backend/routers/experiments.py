@@ -49,41 +49,45 @@ async def create_experiment(
     for f in files:
         filename = f.filename or "file"
         key = f"datasets/{exp_id}/{filename}"
+        content_type = f.content_type or "application/octet-stream"
 
-        content = b""
-        chunk = await f.read(1024 * 1024)
-        while chunk:
-            content += chunk
-            if len(content) > settings.max_upload_size_bytes:
-                raise HTTPException(
-                    status_code=413,
-                    detail=f"File '{filename}' exceeds max upload size of {settings.max_upload_size_bytes // (1024 * 1024)}MB",
-                )
-            chunk = await f.read(1024 * 1024)
-        logger.info("Read %s: %d bytes", filename, len(content))
-
-        # Upload to S3 (for browser / S3 explorer)
-        s3.put_object(
-            Bucket="datasets",
-            Key=key,
-            Body=content,
-            ContentType=f.content_type or "application/octet-stream",
-        )
-
-        # Upload to Modal Volume (for sandbox execution)
-
-        with tempfile.NamedTemporaryFile(delete=False) as tmp:
-            tmp.write(content)
-            tmp_path = tmp.name
+        # Stream to a temp file instead of accumulating in memory.
+        # This keeps memory usage O(chunk_size) instead of O(file_size).
+        total_bytes = 0
+        tmp_fd, tmp_path = tempfile.mkstemp()
         try:
-            await upload_to_volume(tmp_path, f"/datasets/{exp_id}/{filename}")
-        except Exception as e:
-            logger.warning(f"Modal Volume upload failed for {filename}: {e}")
+            with os.fdopen(tmp_fd, "wb") as tmp:
+                chunk = await f.read(1024 * 1024)
+                while chunk:
+                    total_bytes += len(chunk)
+                    if total_bytes > settings.max_upload_size_bytes:
+                        raise HTTPException(
+                            status_code=413,
+                            detail=f"File '{filename}' exceeds max upload size of {settings.max_upload_size_bytes // (1024 * 1024)}MB",
+                        )
+                    tmp.write(chunk)
+                    chunk = await f.read(1024 * 1024)
+            logger.info("Read %s: %d bytes (streamed to disk)", filename, total_bytes)
+
+            # Upload to S3 from disk — boto3 handles multipart automatically
+            with open(tmp_path, "rb") as fobj:
+                s3.upload_fileobj(
+                    fobj,
+                    "datasets",
+                    key,
+                    ExtraArgs={"ContentType": content_type},
+                )
+
+            # Upload to Modal Volume (for sandbox execution)
+            try:
+                await upload_to_volume(tmp_path, f"/datasets/{exp_id}/{filename}")
+            except Exception as e:
+                logger.warning(f"Modal Volume upload failed for {filename}: {e}")
         finally:
             os.unlink(tmp_path)
 
         uploaded_files.append(f"s3://datasets/{key}")
-        logger.info(f"Uploaded {filename} ({len(content)} bytes) → S3 + Modal Volume")
+        logger.info(f"Uploaded {filename} ({total_bytes} bytes) → S3 + Modal Volume")
 
     # dataset_ref: folder for multiple files, single file path otherwise
     if len(uploaded_files) == 1:
