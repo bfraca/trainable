@@ -131,6 +131,8 @@ async def query_prep_data(session_id: str, body: QueryRequest):
                 try:
                     raw = read_volume_file(path)
                     _load_parquet_to_duckdb(con, raw, split)
+                except duckdb.InterruptException:
+                    raise
                 except Exception:
                     pass
 
