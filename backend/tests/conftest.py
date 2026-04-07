@@ -62,6 +62,15 @@ async def setup_db():
         await conn.run_sync(Base.metadata.drop_all)
 
 
+@pytest.fixture(autouse=True)
+def _reset_rate_limiter():
+    """Reset the rate limiter storage before each test so limits don't leak."""
+    limiter = getattr(app.state, "limiter", None)
+    if limiter is not None:
+        limiter.reset()
+    yield
+
+
 @pytest_asyncio.fixture
 async def client():
     """Async test client with S3 mocked."""
