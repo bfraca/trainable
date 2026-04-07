@@ -3,7 +3,14 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api';
-import { SSEEvent, FileTreeNode, Stage, MetricPoint, ChartConfig, GeneratedFile } from '@/lib/types';
+import {
+  SSEEvent,
+  FileTreeNode,
+  Stage,
+  MetricPoint,
+  ChartConfig,
+  GeneratedFile,
+} from '@/lib/types';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import {
   ArrowLeft,
@@ -19,8 +26,8 @@ import {
 import StageNav from '@/components/StageNav';
 import TrainConfigModal from '@/components/TrainConfigModal';
 
+import { connectSSE as connectSSEUtil } from '@/lib/sse';
 import { ChatItem, NEXT_STAGE } from './types';
-import { getSSEBase } from './utils/helpers';
 import {
   buildTreeFromFlatList,
   insertNodeIntoTree,
@@ -90,229 +97,227 @@ export default function ExperimentPage() {
   const connectSSE = useCallback(
     (sid: string) => {
       if (sseRef.current) sseRef.current.close();
-      const url = `${getSSEBase()}/api/sessions/${sid}/stream`;
-      const source = new EventSource(url);
 
-      source.onopen = () => setSseConnected(true);
-      source.onmessage = (e) => {
-        try {
-          const event = JSON.parse(e.data) as SSEEvent;
-
-          switch (event.type) {
-            case 'state_change':
-              setSessionState(event.data.state);
-              if (event.data.state.includes('running')) setIsRunning(true);
-              if (
-                event.data.state.includes('done') ||
-                event.data.state === 'failed' ||
-                event.data.state === 'cancelled'
-              )
-                setIsRunning(false);
-              if (event.data.state.endsWith('_done')) {
-                const stageName = event.data.state.replace('_done', '').toUpperCase();
-                const next = NEXT_STAGE[event.data.state];
-                addItem({
-                  type: 'stage_complete',
-                  content: stageName,
-                  meta: next ? { nextStage: next.stage, nextLabel: next.label } : null,
-                });
-              }
-              break;
-            case 'agent_message':
-              addItem({ type: 'assistant', content: event.data.text });
-              break;
-            case 'agent_token':
-              setChatItems((prev) => {
-                const last = prev[prev.length - 1];
-                if (last && last.type === 'assistant' && Date.now() - last.timestamp < 5000) {
-                  return [...prev.slice(0, -1), { ...last, content: last.content + event.data.text }];
-                }
-                return [
-                  ...prev,
-                  {
-                    id: `${Date.now()}`,
-                    type: 'assistant',
-                    content: event.data.text,
-                    timestamp: Date.now(),
-                  },
-                ];
-              });
-              break;
-            case 'tool_start':
-              addItem({ type: 'tool_start', content: event.data.tool, meta: event.data.input });
-              break;
-            case 'tool_end':
-              setChatItems((prev) => {
-                const idx = prev.findLastIndex(
-                  (i) => i.type === 'tool_start' && i.content === event.data.tool,
-                );
-                if (idx >= 0) {
-                  const updated = [...prev];
-                  const duration = Math.max(
-                    1,
-                    Math.round((Date.now() - updated[idx].timestamp) / 1000),
-                  );
-                  updated[idx] = {
-                    ...updated[idx],
-                    type: 'tool_end',
-                    meta: {
-                      ...updated[idx].meta,
-                      output: event.data.output,
-                      outputs: updated[idx].meta?.outputs || [],
-                      duration,
-                    },
-                  };
-                  return updated;
-                }
-                return [
-                  ...prev,
-                  {
-                    id: `${Date.now()}-${Math.random()}`,
-                    type: 'tool_end',
-                    content: event.data.tool,
-                    meta: { output: event.data.output },
-                    timestamp: Date.now(),
-                  },
-                ];
-              });
-              break;
-            case 'code_output':
-              setChatItems((prev) => {
-                const idx = prev.findLastIndex((i) => i.type === 'tool_start');
-                if (idx >= 0) {
-                  const updated = [...prev];
-                  const outputs = updated[idx].meta?.outputs || [];
-                  updated[idx] = {
-                    ...updated[idx],
-                    meta: {
-                      ...updated[idx].meta,
-                      outputs: [...outputs, { text: event.data.text, stream: event.data.stream }],
-                    },
-                  };
-                  return updated;
-                }
-                addItem({
-                  type: 'code_output',
-                  content: event.data.text,
-                  meta: { stream: event.data.stream },
-                });
-                return prev;
-              });
-              break;
-            case 'agent_error':
-              addItem({ type: 'error', content: event.data.error });
+      const handleEvent = (event: SSEEvent) => {
+        switch (event.type) {
+          case 'state_change':
+            setSessionState(event.data.state);
+            if (event.data.state.includes('running')) setIsRunning(true);
+            if (
+              event.data.state.includes('done') ||
+              event.data.state === 'failed' ||
+              event.data.state === 'cancelled'
+            )
               setIsRunning(false);
-              break;
-            case 'report_ready':
-              setCanvasContent(event.data.content);
-              setCanvasTitle(`${(event.data.stage || 'EDA').toUpperCase()} Report`);
-              setCanvasOpen(true);
-              break;
-            case 'files_ready': {
-              const stage = event.data.stage || '';
-              const newFiles = event.data.files || [];
-              setGeneratedFiles((prev) => {
-                const existingPaths = new Set(prev.map((f) => f.path));
-                const merged = [...prev];
-                for (const f of newFiles) {
-                  if (!existingPaths.has(f.path)) merged.push(f);
-                }
-                return merged;
+            if (event.data.state.endsWith('_done')) {
+              const stageName = event.data.state.replace('_done', '').toUpperCase();
+              const next = NEXT_STAGE[event.data.state];
+              addItem({
+                type: 'stage_complete',
+                content: stageName,
+                meta: next ? { nextStage: next.stage, nextLabel: next.label } : null,
               });
-              setFileTree((prev) => {
-                let merged = JSON.parse(JSON.stringify(prev)) as FileTreeNode;
-                for (const f of newFiles) {
-                  merged = insertNodeIntoTree(
-                    merged,
-                    { name: f.path.split('/').pop() || '', path: f.path, type: 'file' },
-                    `/sessions/${sid}`,
-                    stage,
-                  );
-                }
-                return ensureStageFolders(merged);
-              });
-              break;
             }
-            case 'file_created': {
-              const stage = event.data.stage || '';
-              setFileTree((prev) =>
-                insertNodeIntoTree(
-                  prev,
-                  {
-                    name: event.data.name,
-                    path: event.data.path,
-                    type: 'file',
+            break;
+          case 'agent_message':
+            addItem({ type: 'assistant', content: event.data.text });
+            break;
+          case 'agent_token':
+            setChatItems((prev) => {
+              const last = prev[prev.length - 1];
+              if (last && last.type === 'assistant' && Date.now() - last.timestamp < 5000) {
+                return [...prev.slice(0, -1), { ...last, content: last.content + event.data.text }];
+              }
+              return [
+                ...prev,
+                {
+                  id: `${Date.now()}`,
+                  type: 'assistant',
+                  content: event.data.text,
+                  timestamp: Date.now(),
+                },
+              ];
+            });
+            break;
+          case 'tool_start':
+            addItem({ type: 'tool_start', content: event.data.tool, meta: event.data.input });
+            break;
+          case 'tool_end':
+            setChatItems((prev) => {
+              const idx = prev.findLastIndex(
+                (i) => i.type === 'tool_start' && i.content === event.data.tool,
+              );
+              if (idx >= 0) {
+                const updated = [...prev];
+                const duration = Math.max(
+                  1,
+                  Math.round((Date.now() - updated[idx].timestamp) / 1000),
+                );
+                updated[idx] = {
+                  ...updated[idx],
+                  type: 'tool_end',
+                  meta: {
+                    ...updated[idx].meta,
+                    output: event.data.output,
+                    outputs: updated[idx].meta?.outputs || [],
+                    duration,
                   },
+                };
+                return updated;
+              }
+              return [
+                ...prev,
+                {
+                  id: `${Date.now()}-${Math.random()}`,
+                  type: 'tool_end',
+                  content: event.data.tool,
+                  meta: { output: event.data.output },
+                  timestamp: Date.now(),
+                },
+              ];
+            });
+            break;
+          case 'code_output':
+            setChatItems((prev) => {
+              const idx = prev.findLastIndex((i) => i.type === 'tool_start');
+              if (idx >= 0) {
+                const updated = [...prev];
+                const outputs = updated[idx].meta?.outputs || [];
+                updated[idx] = {
+                  ...updated[idx],
+                  meta: {
+                    ...updated[idx].meta,
+                    outputs: [...outputs, { text: event.data.text, stream: event.data.stream }],
+                  },
+                };
+                return updated;
+              }
+              addItem({
+                type: 'code_output',
+                content: event.data.text,
+                meta: { stream: event.data.stream },
+              });
+              return prev;
+            });
+            break;
+          case 'agent_error':
+            addItem({ type: 'error', content: event.data.error });
+            setIsRunning(false);
+            break;
+          case 'report_ready':
+            setCanvasContent(event.data.content);
+            setCanvasTitle(`${(event.data.stage || 'EDA').toUpperCase()} Report`);
+            setCanvasOpen(true);
+            break;
+          case 'files_ready': {
+            const stage = event.data.stage || '';
+            const newFiles = event.data.files || [];
+            setGeneratedFiles((prev) => {
+              const existingPaths = new Set(prev.map((f) => f.path));
+              const merged = [...prev];
+              for (const f of newFiles) {
+                if (!existingPaths.has(f.path)) merged.push(f);
+              }
+              return merged;
+            });
+            setFileTree((prev) => {
+              let merged = JSON.parse(JSON.stringify(prev)) as FileTreeNode;
+              for (const f of newFiles) {
+                merged = insertNodeIntoTree(
+                  merged,
+                  { name: f.path.split('/').pop() || '', path: f.path, type: 'file' },
                   `/sessions/${sid}`,
                   stage,
-                ),
-              );
-              break;
-            }
-            case 'agent_aborted':
-              addItem({ type: 'status', content: 'Agent stopped' });
-              setIsRunning(false);
-              break;
-            case 'metrics_batch': {
-              const items = event.data.items || [];
-              const newPoints: MetricPoint[] = [];
-              const now = new Date().toISOString();
-              for (const m of items) {
-                const key = `${m.step}:${m.name}:${m.run_tag || ''}`;
-                if (!metricKeysRef.current.has(key)) {
-                  metricKeysRef.current.add(key);
-                  newPoints.push({
-                    step: m.step,
-                    name: m.name,
-                    value: m.value,
-                    stage: m.stage,
-                    run_tag: m.run_tag || null,
-                    created_at: now,
-                  });
-                }
+                );
               }
-              if (newPoints.length > 0) {
-                setMetricPoints((prev) => {
-                  if (prev.length === 0) setCanvasOpen(true);
-                  return [...prev, ...newPoints];
-                });
-              }
-              break;
-            }
-            case 'metric': {
-              const key = `${event.data.step}:${event.data.name}:${event.data.run_tag || ''}`;
+              return ensureStageFolders(merged);
+            });
+            break;
+          }
+          case 'file_created': {
+            const stage = event.data.stage || '';
+            setFileTree((prev) =>
+              insertNodeIntoTree(
+                prev,
+                {
+                  name: event.data.name,
+                  path: event.data.path,
+                  type: 'file',
+                },
+                `/sessions/${sid}`,
+                stage,
+              ),
+            );
+            break;
+          }
+          case 'agent_aborted':
+            addItem({ type: 'status', content: 'Agent stopped' });
+            setIsRunning(false);
+            break;
+          case 'metrics_batch': {
+            const items = event.data.items || [];
+            const newPoints: MetricPoint[] = [];
+            const now = new Date().toISOString();
+            for (const m of items) {
+              const key = `${m.step}:${m.name}:${m.run_tag || ''}`;
               if (!metricKeysRef.current.has(key)) {
                 metricKeysRef.current.add(key);
-                setMetricPoints((prev) => {
-                  if (prev.length === 0) setCanvasOpen(true);
-                  return [
-                    ...prev,
-                    {
-                      step: event.data.step,
-                      name: event.data.name,
-                      value: event.data.value,
-                      stage: event.data.stage,
-                      run_tag: event.data.run_tag || null,
-                      created_at: new Date().toISOString(),
-                    },
-                  ];
+                newPoints.push({
+                  step: m.step,
+                  name: m.name,
+                  value: m.value,
+                  stage: m.stage,
+                  run_tag: m.run_tag || null,
+                  created_at: now,
                 });
               }
-              break;
             }
-            case 'chart_config': {
-              if (event.data.charts && Array.isArray(event.data.charts)) {
-                setChartConfig({ charts: event.data.charts });
-              }
-              break;
+            if (newPoints.length > 0) {
+              setMetricPoints((prev) => {
+                if (prev.length === 0) setCanvasOpen(true);
+                return [...prev, ...newPoints];
+              });
             }
+            break;
           }
-        } catch {
-          /* ignore */
+          case 'metric': {
+            const key = `${event.data.step}:${event.data.name}:${event.data.run_tag || ''}`;
+            if (!metricKeysRef.current.has(key)) {
+              metricKeysRef.current.add(key);
+              setMetricPoints((prev) => {
+                if (prev.length === 0) setCanvasOpen(true);
+                return [
+                  ...prev,
+                  {
+                    step: event.data.step,
+                    name: event.data.name,
+                    value: event.data.value,
+                    stage: event.data.stage,
+                    run_tag: event.data.run_tag || null,
+                    created_at: new Date().toISOString(),
+                  },
+                ];
+              });
+            }
+            break;
+          }
+          case 'chart_config': {
+            if (event.data.charts && Array.isArray(event.data.charts)) {
+              setChartConfig({ charts: event.data.charts });
+            }
+            break;
+          }
         }
       };
-      source.onerror = () => setSseConnected(false);
-      sseRef.current = source;
+
+      // Use the shared SSE utility — single source of truth for connection logic
+      const disconnect = connectSSEUtil(sid, {
+        onEvent: handleEvent,
+        onOpen: () => setSseConnected(true),
+        onError: () => setSseConnected(false),
+      });
+      // Store disconnect fn so we can close from handleStop / cleanup
+      sseRef.current = { close: disconnect } as EventSource;
     },
     [addItem],
   );
@@ -411,9 +416,7 @@ export default function ExperimentPage() {
                   path: string;
                   _stage?: string;
                 }>;
-                const existingPaths = new Set(
-                  restoredFiles.map((f: { path: string }) => f.path),
-                );
+                const existingPaths = new Set(restoredFiles.map((f: { path: string }) => f.path));
                 for (const f of newFiles) {
                   if (!existingPaths.has(f.path)) {
                     restoredFiles.push({ ...f, _stage: stageHint });
@@ -671,9 +674,7 @@ export default function ExperimentPage() {
         <Panel defaultSize={canvasOpen ? 25 : 100} minSize={15}>
           <div className="h-full flex flex-col min-w-0">
             <div className="flex-1 overflow-y-auto px-4 py-4">
-              <div
-                className={`mx-auto w-full space-y-4 ${canvasOpen ? 'max-w-3xl' : 'max-w-5xl'}`}
-              >
+              <div className={`mx-auto w-full space-y-4 ${canvasOpen ? 'max-w-3xl' : 'max-w-5xl'}`}>
                 {chatItems.map((item) => renderChatItem(item))}
 
                 {isRunning &&
