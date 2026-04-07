@@ -31,7 +31,7 @@ from models import ProcessedDatasetMeta
 from services.volume import read_volume_file, reload_volume
 
 logger = logging.getLogger(__name__)
-router = APIRouter()
+router = APIRouter(tags=["Data Explorer"])
 
 # --------------------------------------------------------------------------- #
 # Query validation
@@ -79,8 +79,17 @@ def _validate_query(sql: str) -> None:
 
 
 class QueryRequest(BaseModel):
-    sql: str
-    limit: int = Field(default=100, le=1000, ge=1)
+    """Schema for submitting a SQL query against processed data."""
+
+    sql: str = Field(
+        ..., description="SQL SELECT query to execute against the processed splits"
+    )
+    limit: int = Field(
+        default=100,
+        le=1000,
+        ge=1,
+        description="Maximum number of rows to return (auto-appended as LIMIT if missing from SQL)",
+    )
 
 
 def _load_parquet_to_duckdb(
@@ -91,7 +100,15 @@ def _load_parquet_to_duckdb(
     con.execute(f"CREATE TABLE {table_name} AS SELECT * FROM arrow_table")
 
 
-@router.post("/sessions/{session_id}/prep/query")
+@router.post(
+    "/sessions/{session_id}/prep/query",
+    summary="Run SQL query on processed data",
+    description="Executes a read-only DuckDB SQL query against the processed parquet "
+    "splits (train, val, test). An `all_data` view is automatically created combining "
+    "all splits with a 'split' column. Security hardened: only SELECT queries are "
+    "allowed, filesystem-access functions are blocked, and queries are subject to a "
+    "configurable timeout (default 30s). LIMIT is auto-appended when missing.",
+)
 async def query_prep_data(session_id: str, body: QueryRequest):
     """Run a read-only DuckDB SQL query against the processed parquet files.
 
@@ -183,7 +200,13 @@ async def query_prep_data(session_id: str, body: QueryRequest):
             timer_holder[0].cancel()
 
 
-@router.get("/sessions/{session_id}/prep/preview")
+@router.get(
+    "/sessions/{session_id}/prep/preview",
+    summary="Preview processed data split",
+    description="Returns the first N rows of a processed data split (train, val, or test) "
+    "for quick inspection. Lighter than the full query endpoint — no SQL parsing, "
+    "no timeout machinery. Returns 404 if the split parquet file does not exist.",
+)
 async def preview_prep_data(
     session_id: str,
     split: str = Query("train", pattern="^(train|val|test)$"),
@@ -217,7 +240,13 @@ async def preview_prep_data(
     return await asyncio.to_thread(_blocking)
 
 
-@router.get("/sessions/{session_id}/prep/metadata")
+@router.get(
+    "/sessions/{session_id}/prep/metadata",
+    summary="Get processed dataset metadata",
+    description="Returns metadata about the processed dataset for a session, including "
+    "column names, data types, row counts per split, and any preprocessing "
+    "transformations applied. Returns 404 if no metadata exists yet.",
+)
 async def get_prep_metadata(session_id: str, db: AsyncSession = Depends(get_db)):
     """Get the processed dataset metadata for a session."""
 

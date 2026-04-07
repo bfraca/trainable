@@ -44,7 +44,16 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="Trainable v2", lifespan=lifespan)
+app = FastAPI(
+    title="Trainable v2",
+    description=(
+        "Autonomous ML pipeline API. Trainable orchestrates three stages "
+        "(EDA → Prep → Train) driven by an AI agent, with real-time SSE "
+        "streaming, S3 dataset storage, and DuckDB-powered data exploration."
+    ),
+    version="2.0.0",
+    lifespan=lifespan,
+)
 app.add_exception_handler(Exception, generic_exception_handler)
 
 app.add_middleware(APIKeyMiddleware)
@@ -69,6 +78,11 @@ app.include_router(files.router, prefix="/api")
 app.include_router(data_explorer.router, prefix="/api")
 
 
-@app.get("/api/health")
+@app.get(
+    "/api/health",
+    summary="Health check",
+    description="Returns the current health status of the API server.",
+    tags=["System"],
+)
 async def health():
     return {"status": "ok"}

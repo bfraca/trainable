@@ -14,7 +14,7 @@ from fastapi.responses import Response
 from services.volume import get_volume
 
 logger = logging.getLogger(__name__)
-router = APIRouter()
+router = APIRouter(tags=["Files"])
 
 _ALLOWED_PREFIXES = ("/sessions/", "/datasets/")
 
@@ -38,7 +38,13 @@ def _validate_path(path: str) -> str:
     return normalized
 
 
-@router.get("/files/list")
+@router.get(
+    "/files/list",
+    summary="List files in Modal Volume",
+    description="Lists files and directories at the given path in the Modal Volume. "
+    "Only paths under /sessions/ and /datasets/ are accessible. Path traversal "
+    "attempts are rejected.",
+)
 async def list_files(path: str = "/"):
     """List files/dirs in Modal Volume at given path."""
     try:
@@ -61,7 +67,13 @@ async def list_files(path: str = "/"):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/files/read")
+@router.get(
+    "/files/read",
+    summary="Read a text file",
+    description="Reads a text file from Modal Volume and returns its UTF-8 content. "
+    "Binary files will have replacement characters for non-decodable bytes. "
+    "Returns 404 if the file does not exist.",
+)
 async def read_file(path: str):
     """Read a text file from Modal Volume."""
     try:
@@ -78,7 +90,13 @@ async def read_file(path: str):
         raise HTTPException(status_code=404, detail=str(e))
 
 
-@router.get("/files/raw")
+@router.get(
+    "/files/raw",
+    summary="Serve a raw file",
+    description="Serves a raw binary file from Modal Volume with the appropriate "
+    "MIME type. Used for images, charts, and other binary artifacts generated "
+    "by the agent.",
+)
 async def raw_file(path: str):
     """Serve a raw file from Modal Volume (images, etc.)."""
     try:
@@ -96,7 +114,14 @@ async def raw_file(path: str):
         raise HTTPException(status_code=404, detail=str(e))
 
 
-@router.get("/files/tree")
+@router.get(
+    "/files/tree",
+    summary="Get file tree",
+    description="Returns a nested file tree rooted at the given path. Infrastructure "
+    "directories (sessions/, UUIDs) are automatically unwrapped so the UI sees "
+    "stage directories (eda/, prep/, train/) at the top level. Directories are "
+    "sorted before files, both alphabetically.",
+)
 async def file_tree(root: str = "/"):
     """Return a nested file tree from Modal Volume.
 

@@ -22,10 +22,15 @@ from services.s3_client import get_s3_client
 from services.volume import upload_to_volume
 
 logger = logging.getLogger(__name__)
-router = APIRouter()
+router = APIRouter(tags=["Experiments"])
 
 
-@router.get("/experiments")
+@router.get(
+    "/experiments",
+    summary="List all experiments",
+    description="Returns all experiments ordered by creation date (newest first), "
+    "including their associated sessions.",
+)
 async def list_experiments(db: AsyncSession = Depends(get_db)):
     result = await db.execute(
         select(Experiment)
@@ -36,14 +41,23 @@ async def list_experiments(db: AsyncSession = Depends(get_db)):
     return [e.to_dict(sessions=e.sessions) for e in experiments]
 
 
-@router.post("/experiments")
+@router.post(
+    "/experiments",
+    summary="Create experiment with file upload",
+    description="Creates a new experiment by uploading one or more dataset files. "
+    "Files are streamed to a temporary location on disk (O(chunk) memory), then "
+    "uploaded to S3 and Modal Volume for sandbox execution. A default session is "
+    "created automatically. Rate-limited to prevent abuse.",
+)
 @limiter.limit(settings.rate_limit_upload)
 async def create_experiment(
     request: Request,
-    name: str = Form(...),
-    description: str = Form(""),
-    instructions: str = Form(""),
-    files: List[UploadFile] = File(...),
+    name: str = Form(..., description="Human-readable experiment name"),
+    description: str = Form("", description="Optional experiment description"),
+    instructions: str = Form("", description="Custom instructions for the AI agent"),
+    files: List[UploadFile] = File(
+        ..., description="One or more dataset files to upload"
+    ),
     db: AsyncSession = Depends(get_db),
 ):
     exp_id = str(uuid.uuid4())
@@ -128,12 +142,20 @@ async def create_experiment(
     }
 
 
-@router.post("/experiments/from-s3")
+@router.post(
+    "/experiments/from-s3",
+    summary="Create experiment from existing S3 dataset",
+    description="Creates a new experiment referencing a dataset already stored in S3. "
+    "The S3 objects are synced to Modal Volume so agent sandboxes can access them. "
+    "Supports both single-file (s3://bucket/key) and prefix (s3://bucket/prefix/) paths.",
+)
 async def create_experiment_from_s3(
-    name: str = Form(...),
-    description: str = Form(""),
-    instructions: str = Form(""),
-    s3_path: str = Form(...),
+    name: str = Form(..., description="Human-readable experiment name"),
+    description: str = Form("", description="Optional experiment description"),
+    instructions: str = Form("", description="Custom instructions for the AI agent"),
+    s3_path: str = Form(
+        ..., description="S3 URI (e.g. s3://bucket/key or s3://bucket/prefix/)"
+    ),
     db: AsyncSession = Depends(get_db),
 ):
     """Create experiment referencing an existing S3 dataset."""
@@ -215,7 +237,12 @@ async def create_experiment_from_s3(
     }
 
 
-@router.get("/experiments/{experiment_id}")
+@router.get(
+    "/experiments/{experiment_id}",
+    summary="Get experiment details",
+    description="Returns a single experiment with its full session list. "
+    "Raises 404 if the experiment does not exist.",
+)
 async def get_experiment(experiment_id: str, db: AsyncSession = Depends(get_db)):
     result = await db.execute(
         select(Experiment)
@@ -231,7 +258,12 @@ async def get_experiment(experiment_id: str, db: AsyncSession = Depends(get_db))
     }
 
 
-@router.delete("/experiments/{experiment_id}")
+@router.delete(
+    "/experiments/{experiment_id}",
+    summary="Delete an experiment",
+    description="Permanently deletes an experiment and all associated data. "
+    "Raises 404 if the experiment does not exist.",
+)
 async def delete_experiment(experiment_id: str, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Experiment).where(Experiment.id == experiment_id))
     experiment = result.scalar_one_or_none()

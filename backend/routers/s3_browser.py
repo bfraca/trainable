@@ -7,24 +7,34 @@ import logging
 from typing import Optional
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from config import settings
 from services.s3_client import get_s3_client, get_s3_external_endpoint
 
 logger = logging.getLogger(__name__)
-router = APIRouter()
+router = APIRouter(tags=["S3 Browser"])
 
 
 class PresignRequest(BaseModel):
-    bucket: str
-    key: str
-    expires_in: int = 3600
+    """Schema for requesting a presigned S3 upload URL."""
+
+    bucket: str = Field(..., description="Target S3 bucket name")
+    key: str = Field(..., description="Object key (path) within the bucket")
+    expires_in: int = Field(
+        3600, description="URL expiry time in seconds (default: 1 hour)"
+    )
 
 
-@router.get("/buckets")
+@router.get(
+    "/buckets",
+    summary="List S3 buckets",
+    description="Returns a list of all S3 buckets accessible to the configured "
+    "S3 client (MinIO in development, AWS S3 in production).",
+)
 async def list_buckets():
     try:
+
         def _blocking():
             response = get_s3_client().list_buckets()
             return [b["Name"] for b in response.get("Buckets", [])]
@@ -36,7 +46,13 @@ async def list_buckets():
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/list")
+@router.get(
+    "/list",
+    summary="List S3 objects",
+    description="Lists objects and folder prefixes within an S3 bucket. Uses delimiter-based "
+    "listing to simulate folder navigation. Returns both folders (common prefixes) and "
+    "files (objects) at the given prefix level.",
+)
 async def list_objects(bucket: str, prefix: Optional[str] = ""):
     try:
         params = {"Bucket": bucket, "Delimiter": "/"}
@@ -69,9 +85,16 @@ async def list_objects(bucket: str, prefix: Optional[str] = ""):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/presign")
+@router.post(
+    "/presign",
+    summary="Generate presigned upload URL",
+    description="Generates a presigned S3 URL for uploading a file directly from the "
+    "browser. The internal S3 endpoint is replaced with the external endpoint so "
+    "the browser can reach it. Default expiry is 1 hour.",
+)
 async def generate_presigned_url(req: PresignRequest):
     try:
+
         def _blocking():
             return get_s3_client().generate_presigned_url(
                 "put_object",
@@ -90,7 +113,13 @@ async def generate_presigned_url(req: PresignRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/upload")
+@router.post(
+    "/upload",
+    summary="Upload file to S3",
+    description="Uploads a file to the specified S3 bucket and key. The file content "
+    "is read into memory and uploaded via the S3 client. For large files, prefer "
+    "using the presigned URL endpoint instead.",
+)
 async def upload_file(bucket: str, key: str, file: UploadFile = File(...)):
     try:
         content = await file.read()
@@ -115,9 +144,15 @@ async def upload_file(bucket: str, key: str, file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/download")
+@router.get(
+    "/download",
+    summary="Get presigned download URL",
+    description="Generates a presigned S3 URL for downloading a file. The URL is valid "
+    "for 1 hour and uses the external S3 endpoint for browser accessibility.",
+)
 async def get_download_url(bucket: str, key: str):
     try:
+
         def _blocking():
             return get_s3_client().generate_presigned_url(
                 "get_object",
