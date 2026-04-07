@@ -55,10 +55,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-# Rate limiting must be added last so it becomes the outermost middleware
-# (after CORS).  Execution order: CORS → SlowAPI → APIKey → route.
-# This ensures unauthenticated requests are rate-limited before reaching
-# APIKeyMiddleware, preventing brute-force / DoS without rate limits.
+# Rate limiting must be added last so it becomes the outermost middleware.
+# Execution order: SlowAPI → CORS → APIKey → route.
+# This ensures all requests (including unauthenticated ones) are
+# rate-limited before reaching APIKeyMiddleware.
 setup_rate_limiting(app)
 
 app.include_router(experiments.router, prefix="/api")
