@@ -39,15 +39,15 @@ graph LR
 
 ## Tech Stack
 
-| Layer | Technology | Purpose |
-|-------|-----------|---------|
-| Frontend | Next.js 14, React 18, TypeScript, Tailwind | UI: gallery, studio, live charts |
-| Backend | FastAPI, SQLAlchemy (async), Python 3.11 | API, agent orchestration, SSE |
-| AI Agent | Claude Agent SDK, custom MCP server | Autonomous code generation + execution |
-| Execution | Modal (sandboxes + volumes) | Isolated Python containers, optional GPU |
-| Database | SQLite (dev) / PostgreSQL (prod) | Experiments, sessions, messages, artifacts, metrics |
-| Object Storage | S3 / MinIO | Dataset uploads, artifact persistence |
-| Real-time | Server-Sent Events (SSE) | Stream agent output to browser |
+| Layer          | Technology                                 | Purpose                                             |
+| -------------- | ------------------------------------------ | --------------------------------------------------- |
+| Frontend       | Next.js 14, React 18, TypeScript, Tailwind | UI: gallery, studio, live charts                    |
+| Backend        | FastAPI, SQLAlchemy (async), Python 3.11   | API, agent orchestration, SSE                       |
+| AI Agent       | Claude Agent SDK, custom MCP server        | Autonomous code generation + execution              |
+| Execution      | Modal (sandboxes + volumes)                | Isolated Python containers, optional GPU            |
+| Database       | SQLite (dev) / PostgreSQL (prod)           | Experiments, sessions, messages, artifacts, metrics |
+| Object Storage | S3 / MinIO                                 | Dataset uploads, artifact persistence               |
+| Real-time      | Server-Sent Events (SSE)                   | Stream agent output to browser                      |
 
 ---
 
@@ -130,30 +130,36 @@ erDiagram
 ### Table Details
 
 **experiments** — Top-level entity. One per uploaded dataset.
+
 - `id` (UUID): primary key
 - `dataset_ref` (string): S3 URI pointing to uploaded files
 - `instructions` (text): user-provided guidance passed to agents
 
 **sessions** — One execution run of the EDA→Prep→Train pipeline.
+
 - `state` (enum): `created → eda_running → eda_done → prep_running → prep_done → train_running → train_done | failed | cancelled`
 - An experiment can have multiple sessions (re-runs)
 
 **messages** — Chat history between user and agent.
+
 - `role`: `user`, `assistant`, `tool`, or `system`
 - `metadata_` (JSON): event type, tool input/output, stage info
 
 **artifacts** — Files generated during each stage.
+
 - `stage`: `eda`, `prep`, or `train`
 - `artifact_type`: `report`, `chart`, `dataset`, `model`, `script`, `metadata`, `file`
 - `path`: Modal Volume path; `s3_path`: S3 URI (set after sync)
 
 **metrics** — Training metrics for live dashboard.
+
 - `step` (int): iteration/epoch number
 - `name` (string): metric name (e.g., `train_loss`, `val_accuracy`)
 - `value` (float): metric value
 - `run_tag` (string, optional): model name for multi-model comparison
 
 **processed_dataset_meta** — Extracted after prep stage (1:1 with session).
+
 - `columns`, `feature_columns`, `target_column`: schema info
 - `total_rows`, `train_rows`, `val_rows`, `test_rows`: split sizes
 - `quality_stats` (JSON): missing values, duplicates, etc.
@@ -326,41 +332,41 @@ trainable-monorepo/
 
 ## Communication Patterns
 
-| Direction | Protocol | When |
-|-----------|----------|------|
-| Frontend → Backend | REST (JSON) | User actions: create experiment, start stage, send message |
-| Backend → Frontend | SSE (streaming) | Agent output: text, code execution, metrics, files |
-| Backend → Modal | Modal SDK (`Sandbox.create.aio`) | Sandbox creation, code execution, volume I/O |
-| Backend → Claude | Claude Agent SDK (`query()`) | Agent loop: prompt → code gen → tool call → repeat |
-| Backend → S3 | Boto3 | Dataset upload, artifact sync |
-| Backend → DB | SQLAlchemy async | All state persistence |
+| Direction          | Protocol                         | When                                                       |
+| ------------------ | -------------------------------- | ---------------------------------------------------------- |
+| Frontend → Backend | REST (JSON)                      | User actions: create experiment, start stage, send message |
+| Backend → Frontend | SSE (streaming)                  | Agent output: text, code execution, metrics, files         |
+| Backend → Modal    | Modal SDK (`Sandbox.create.aio`) | Sandbox creation, code execution, volume I/O               |
+| Backend → Claude   | Claude Agent SDK (`query()`)     | Agent loop: prompt → code gen → tool call → repeat         |
+| Backend → S3       | Boto3                            | Dataset upload, artifact sync                              |
+| Backend → DB       | SQLAlchemy async                 | All state persistence                                      |
 
 ## SSE Event Types
 
-| Event | Source | Data |
-|-------|--------|------|
-| `state_change` | sessions.py | `{state}` |
-| `agent_message` | agent.py | `{text}` |
-| `tool_start` | agent.py | `{tool, input}` |
-| `tool_end` | agent.py | `{tool, output}` |
-| `code_output` | sandbox.py | `{stream, text}` |
-| `file_created` | agent.py | `{path, name, stage}` |
-| `report_ready` | agent.py | `{content, stage}` |
-| `files_ready` | agent.py | `{files[], stage}` |
-| `metrics_batch` | metrics.py | `{items[{step, name, value, stage, run_tag}]}` |
-| `chart_config` | metrics.py | `{charts[{title, metrics, type}]}` |
-| `validation_result` | agent.py | `{passed[], warnings[], errors[]}` |
-| `s3_sync_complete` | agent.py | `{files_synced, s3_prefix}` |
+| Event               | Source      | Data                                           |
+| ------------------- | ----------- | ---------------------------------------------- |
+| `state_change`      | sessions.py | `{state}`                                      |
+| `agent_message`     | agent.py    | `{text}`                                       |
+| `tool_start`        | agent.py    | `{tool, input}`                                |
+| `tool_end`          | agent.py    | `{tool, output}`                               |
+| `code_output`       | sandbox.py  | `{stream, text}`                               |
+| `file_created`      | agent.py    | `{path, name, stage}`                          |
+| `report_ready`      | agent.py    | `{content, stage}`                             |
+| `files_ready`       | agent.py    | `{files[], stage}`                             |
+| `metrics_batch`     | metrics.py  | `{items[{step, name, value, stage, run_tag}]}` |
+| `chart_config`      | metrics.py  | `{charts[{title, metrics, type}]}`             |
+| `validation_result` | agent.py    | `{passed[], warnings[], errors[]}`             |
+| `s3_sync_complete`  | agent.py    | `{files_synced, s3_prefix}`                    |
 
 ## Agent Architecture
 
 Three stage agents share a common execution pipeline but have different system prompts:
 
-| Agent | Purpose | Key Output |
-|-------|---------|------------|
-| **EDA** | Explore data quality, distributions, correlations | report.md, figures/*.png |
-| **Prep** | Clean, transform, split into train/val/test | train.parquet, val.parquet, test.parquet, metadata.json |
-| **Train** | Train models, tune hyperparameters, evaluate | model.pkl, metrics, SHAP plots |
+| Agent     | Purpose                                           | Key Output                                              |
+| --------- | ------------------------------------------------- | ------------------------------------------------------- |
+| **EDA**   | Explore data quality, distributions, correlations | report.md, figures/\*.png                               |
+| **Prep**  | Clean, transform, split into train/val/test       | train.parquet, val.parquet, test.parquet, metadata.json |
+| **Train** | Train models, tune hyperparameters, evaluate      | model.pkl, metrics, SHAP plots                          |
 
 See [agents.md](agents.md) for detailed agent documentation.
 
@@ -412,11 +418,11 @@ docker compose up
 
 ### Environment Variables
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `ANTHROPIC_API_KEY` | Yes | Claude API key for the agent |
-| `MODAL_TOKEN_ID` / `MODAL_TOKEN_SECRET` | Yes | Modal auth (or use `modal token set`) |
-| `DATABASE_URL` | No | PostgreSQL URL (defaults to SQLite) |
-| `S3_ENDPOINT` | No | S3/MinIO endpoint (defaults to AWS) |
-| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | No | S3 credentials |
-| `CLAUDE_MODEL` | No | Model override (defaults to `claude-opus-4-6`) |
+| Variable                                      | Required | Description                                    |
+| --------------------------------------------- | -------- | ---------------------------------------------- |
+| `ANTHROPIC_API_KEY`                           | Yes      | Claude API key for the agent                   |
+| `MODAL_TOKEN_ID` / `MODAL_TOKEN_SECRET`       | Yes      | Modal auth (or use `modal token set`)          |
+| `DATABASE_URL`                                | No       | PostgreSQL URL (defaults to SQLite)            |
+| `S3_ENDPOINT`                                 | No       | S3/MinIO endpoint (defaults to AWS)            |
+| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | No       | S3 credentials                                 |
+| `CLAUDE_MODEL`                                | No       | Model override (defaults to `claude-opus-4-6`) |
