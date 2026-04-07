@@ -49,7 +49,8 @@ services:
       - ./backend:/app
       - ~/.modal.toml:/home/trainable/.modal.toml:ro
       - ~/.claude:/home/trainable/.claude:ro
-    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    command:
+      ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
     depends_on:
       postgres:
         condition: service_healthy

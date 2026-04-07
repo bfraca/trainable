@@ -47,22 +47,22 @@ This is the **only tool** available to all three agents. It:
 
 Every agent action is published to the frontend via **Server-Sent Events (SSE)**:
 
-| Event | When | Data |
-|-------|------|------|
-| `state_change` | Stage starts/ends | `{state: "eda_running"}` |
-| `agent_message` | Agent produces text | `{text: "..."}` |
-| `tool_start` | Code execution begins | `{tool: "execute_code", input: {code: "..."}}` |
-| `tool_end` | Code execution finishes | `{tool: "execute_code", output: "..."}` |
-| `code_output` | Stdout chunk streamed | `{stream: "stdout", text: "..."}` |
-| `file_created` | New file detected | `{path, name, stage}` |
-| `report_ready` | Report.md content | `{content: "...", stage}` |
-| `files_ready` | All stage files listed | `{files: [...], stage}` |
-| `metric` | Training metric logged | `{step, metrics, run}` |
-| `chart_config` | Dashboard layout defined | `{charts: [...]}` |
-| `validation_result` | Post-stage validation | `{passed, warnings, errors}` |
-| `s3_sync_complete` | Artifacts uploaded to S3 | `{files_synced, s3_prefix}` |
-| `agent_error` | Agent crashed | `{error: "..."}` |
-| `agent_aborted` | User cancelled | `{reason, stage}` |
+| Event               | When                     | Data                                           |
+| ------------------- | ------------------------ | ---------------------------------------------- |
+| `state_change`      | Stage starts/ends        | `{state: "eda_running"}`                       |
+| `agent_message`     | Agent produces text      | `{text: "..."}`                                |
+| `tool_start`        | Code execution begins    | `{tool: "execute_code", input: {code: "..."}}` |
+| `tool_end`          | Code execution finishes  | `{tool: "execute_code", output: "..."}`        |
+| `code_output`       | Stdout chunk streamed    | `{stream: "stdout", text: "..."}`              |
+| `file_created`      | New file detected        | `{path, name, stage}`                          |
+| `report_ready`      | Report.md content        | `{content: "...", stage}`                      |
+| `files_ready`       | All stage files listed   | `{files: [...], stage}`                        |
+| `metric`            | Training metric logged   | `{step, metrics, run}`                         |
+| `chart_config`      | Dashboard layout defined | `{charts: [...]}`                              |
+| `validation_result` | Post-stage validation    | `{passed, warnings, errors}`                   |
+| `s3_sync_complete`  | Artifacts uploaded to S3 | `{files_synced, s3_prefix}`                    |
+| `agent_error`       | Agent crashed            | `{error: "..."}`                               |
+| `agent_aborted`     | User cancelled           | `{reason, stage}`                              |
 
 ---
 
@@ -93,12 +93,12 @@ Every agent action is published to the frontend via **Server-Sent Events (SSE)**
 
 ### Output artifacts
 
-| Path | Description |
-|------|-------------|
-| `/data/sessions/{id}/eda/report.md` | Markdown report with findings and recommendations |
-| `/data/sessions/{id}/eda/figures/*.png` | Charts: distributions, correlations, heatmaps |
-| `/data/sessions/{id}/eda/data/` | Summary CSVs, profiling outputs |
-| `/data/sessions/{id}/eda/scripts/` | Auto-saved Python scripts (step_01_*.py, etc.) |
+| Path                                    | Description                                       |
+| --------------------------------------- | ------------------------------------------------- |
+| `/data/sessions/{id}/eda/report.md`     | Markdown report with findings and recommendations |
+| `/data/sessions/{id}/eda/figures/*.png` | Charts: distributions, correlations, heatmaps     |
+| `/data/sessions/{id}/eda/data/`         | Summary CSVs, profiling outputs                   |
+| `/data/sessions/{id}/eda/scripts/`      | Auto-saved Python scripts (step*01*\*.py, etc.)   |
 
 ### Key libraries used
 
@@ -140,16 +140,16 @@ pandas, numpy, matplotlib, seaborn, scikit-learn, duckdb (for large datasets >1M
 
 ### Output artifacts
 
-| Path | Description |
-|------|-------------|
-| `/data/sessions/{id}/prep/data/train.parquet` | Training set |
-| `/data/sessions/{id}/prep/data/val.parquet` | Validation set |
-| `/data/sessions/{id}/prep/data/test.parquet` | Test set |
-| `/data/sessions/{id}/prep/data/metadata.json` | Target column, features, splits, transforms |
-| `/data/sessions/{id}/prep/data/prep_pipeline.pkl` | Fitted sklearn Pipeline/ColumnTransformer |
-| `/data/sessions/{id}/prep/report.md` | Decisions and statistics report |
-| `/data/sessions/{id}/prep/figures/` | Distribution/transform visualizations |
-| `/data/sessions/{id}/prep/scripts/` | Auto-saved Python scripts |
+| Path                                              | Description                                 |
+| ------------------------------------------------- | ------------------------------------------- |
+| `/data/sessions/{id}/prep/data/train.parquet`     | Training set                                |
+| `/data/sessions/{id}/prep/data/val.parquet`       | Validation set                              |
+| `/data/sessions/{id}/prep/data/test.parquet`      | Test set                                    |
+| `/data/sessions/{id}/prep/data/metadata.json`     | Target column, features, splits, transforms |
+| `/data/sessions/{id}/prep/data/prep_pipeline.pkl` | Fitted sklearn Pipeline/ColumnTransformer   |
+| `/data/sessions/{id}/prep/report.md`              | Decisions and statistics report             |
+| `/data/sessions/{id}/prep/figures/`               | Distribution/transform visualizations       |
+| `/data/sessions/{id}/prep/scripts/`               | Auto-saved Python scripts                   |
 
 ### metadata.json structure
 
@@ -161,11 +161,11 @@ pandas, numpy, matplotlib, seaborn, scikit-learn, duckdb (for large datasets >1M
   "categorical_features": ["..."],
   "numeric_features": ["..."],
   "n_classes": 3,
-  "class_distribution": {"A": 100, "B": 50, "C": 30},
+  "class_distribution": { "A": 100, "B": 50, "C": 30 },
   "splits": {
-    "train": {"rows": 700},
-    "val": {"rows": 150},
-    "test": {"rows": 150}
+    "train": { "rows": 700 },
+    "val": { "rows": 150 },
+    "test": { "rows": 150 }
   },
   "transforms": {},
   "random_seed": 42,
@@ -240,6 +240,7 @@ log(step=epoch, metrics={"train_loss": 0.5, "val_loss": 0.6}, run="xgboost")
 ```
 
 How it works under the hood:
+
 1. `log()` and `configure_dashboard()` print JSON to stdout
 2. The sandbox streams stdout chunks in real-time
 3. `services/metrics.py` parses JSON lines, persists to the `Metric` DB table, and publishes SSE events
@@ -247,23 +248,23 @@ How it works under the hood:
 
 ### Output artifacts
 
-| Path | Description |
-|------|-------------|
-| `/data/sessions/{id}/train/models/model.pkl` | Best model (joblib serialized) |
-| `/data/sessions/{id}/train/data/metadata.json` | Model info, test metrics, feature importance |
-| `/data/sessions/{id}/train/report.md` | Full training report |
-| `/data/sessions/{id}/train/figures/` | SHAP plots, confusion matrix, learning curves |
-| `/data/sessions/{id}/train/scripts/` | Auto-saved Python scripts |
+| Path                                           | Description                                   |
+| ---------------------------------------------- | --------------------------------------------- |
+| `/data/sessions/{id}/train/models/model.pkl`   | Best model (joblib serialized)                |
+| `/data/sessions/{id}/train/data/metadata.json` | Model info, test metrics, feature importance  |
+| `/data/sessions/{id}/train/report.md`          | Full training report                          |
+| `/data/sessions/{id}/train/figures/`           | SHAP plots, confusion matrix, learning curves |
+| `/data/sessions/{id}/train/scripts/`           | Auto-saved Python scripts                     |
 
 ### train metadata.json structure
 
 ```json
 {
   "best_model": "XGBoost",
-  "best_model_params": {"max_depth": 6, "learning_rate": 0.1},
+  "best_model_params": { "max_depth": 6, "learning_rate": 0.1 },
   "models_evaluated": ["LogisticRegression", "RandomForest", "XGBoost"],
-  "test_metrics": {"accuracy": 0.92, "f1": 0.89, "roc_auc": 0.95},
-  "feature_importance": {"feature_1": 0.25, "feature_2": 0.18},
+  "test_metrics": { "accuracy": 0.92, "f1": 0.89, "roc_auc": 0.95 },
+  "feature_importance": { "feature_1": 0.25, "feature_2": 0.18 },
   "class_imbalance_strategy": "class_weight=balanced",
   "tuning_method": "optuna",
   "tuning_trials": 50,
@@ -336,18 +337,18 @@ When a user sends a message with `run_agent: true`:
 
 All three agents have access to the same sandbox environment:
 
-| Category | Libraries |
-|----------|-----------|
-| Data | pandas, numpy, pyarrow, openpyxl, duckdb |
-| Visualization | matplotlib, seaborn |
-| ML (classical) | scikit-learn, xgboost, lightgbm |
+| Category           | Libraries                                      |
+| ------------------ | ---------------------------------------------- |
+| Data               | pandas, numpy, pyarrow, openpyxl, duckdb       |
+| Visualization      | matplotlib, seaborn                            |
+| ML (classical)     | scikit-learn, xgboost, lightgbm                |
 | ML (deep learning) | torch, torchvision, torchaudio, tensorflow-cpu |
-| Tuning | optuna |
-| Imbalance | imbalanced-learn |
-| Encoding | category_encoders |
-| Validation | pandera |
-| Explainability | shap |
-| Statistics | statsmodels |
+| Tuning             | optuna                                         |
+| Imbalance          | imbalanced-learn                               |
+| Encoding           | category_encoders                              |
+| Validation         | pandera                                        |
+| Explainability     | shap                                           |
+| Statistics         | statsmodels                                    |
 
 ### Sandbox configuration
 

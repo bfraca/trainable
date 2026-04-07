@@ -78,6 +78,7 @@ docker compose up
 ```
 
 This starts:
+
 - **Frontend**: http://localhost:3000
 - **Backend API**: http://localhost:8000
 - **MinIO Console**: http://localhost:9001 (minioadmin/minioadmin)
@@ -92,16 +93,16 @@ pytest tests/ -v
 
 ## Environment Variables
 
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `ANTHROPIC_API_KEY` | Yes | — | Claude API key for the AI agent |
-| `MODAL_TOKEN_ID` | Yes* | — | Modal auth (*or run `modal token set`) |
-| `MODAL_TOKEN_SECRET` | Yes* | — | Modal auth |
-| `DATABASE_URL` | No | SQLite (local file) | PostgreSQL connection string |
-| `S3_ENDPOINT` | No | AWS S3 | S3-compatible endpoint (MinIO, etc.) |
-| `AWS_ACCESS_KEY_ID` | No | — | S3 credentials |
-| `AWS_SECRET_ACCESS_KEY` | No | — | S3 credentials |
-| `CLAUDE_MODEL` | No | `claude-opus-4-6` | Model for the AI agent |
+| Variable                | Required | Default             | Description                             |
+| ----------------------- | -------- | ------------------- | --------------------------------------- |
+| `ANTHROPIC_API_KEY`     | Yes      | —                   | Claude API key for the AI agent         |
+| `MODAL_TOKEN_ID`        | Yes\*    | —                   | Modal auth (\*or run `modal token set`) |
+| `MODAL_TOKEN_SECRET`    | Yes\*    | —                   | Modal auth                              |
+| `DATABASE_URL`          | No       | SQLite (local file) | PostgreSQL connection string            |
+| `S3_ENDPOINT`           | No       | AWS S3              | S3-compatible endpoint (MinIO, etc.)    |
+| `AWS_ACCESS_KEY_ID`     | No       | —                   | S3 credentials                          |
+| `AWS_SECRET_ACCESS_KEY` | No       | —                   | S3 credentials                          |
+| `CLAUDE_MODEL`          | No       | `claude-opus-4-6`   | Model for the AI agent                  |
 
 ## Project Structure
 

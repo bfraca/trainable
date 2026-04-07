@@ -1,9 +1,7 @@
-import type { Config } from 'tailwindcss'
+import type { Config } from 'tailwindcss';
 
 const config: Config = {
-  content: [
-    './src/**/*.{js,ts,jsx,tsx,mdx}',
-  ],
+  content: ['./src/**/*.{js,ts,jsx,tsx,mdx}'],
   theme: {
     extend: {
       colors: {
@@ -27,12 +25,12 @@ const config: Config = {
         },
       },
       screens: {
-        'xs': '475px',
+        xs: '475px',
       },
       animation: {
         'pulse-subtle': 'pulse-subtle 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-        'blink': 'blink 1s ease-in-out infinite',
-        'typing': 'typing 1.5s infinite',
+        blink: 'blink 1s ease-in-out infinite',
+        typing: 'typing 1.5s infinite',
         'fade-in': 'fade-in 0.2s ease-out',
         'slide-up': 'slide-up 0.3s ease-out',
         'slide-down': 'slide-down 0.3s ease-out',
@@ -40,7 +38,7 @@ const config: Config = {
         'slide-in-right': 'slide-in-right 0.3s ease-out',
         'toast-in': 'toast-in 0.3s ease-out',
         'toast-out': 'toast-out 0.2s ease-in forwards',
-        'orbit': 'orbit 1.5s linear infinite',
+        orbit: 'orbit 1.5s linear infinite',
         'orbit-reverse': 'orbit-reverse 2s linear infinite',
         'pulse-ring': 'pulse-ring 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite',
       },
@@ -49,11 +47,11 @@ const config: Config = {
           '0%, 100%': { opacity: '1', transform: 'scale(1)' },
           '50%': { opacity: '0.9', transform: 'scale(1.02)' },
         },
-        'blink': {
+        blink: {
           '0%, 100%': { opacity: '1' },
           '50%': { opacity: '0' },
         },
-        'typing': {
+        typing: {
           '0%': { opacity: '0.2' },
           '20%': { opacity: '1' },
           '100%': { opacity: '0.2' },
@@ -86,7 +84,7 @@ const config: Config = {
           '0%': { opacity: '1', transform: 'translateX(0)' },
           '100%': { opacity: '0', transform: 'translateX(100%)' },
         },
-        'orbit': {
+        orbit: {
           '0%': { transform: 'rotate(0deg)' },
           '100%': { transform: 'rotate(360deg)' },
         },
@@ -101,13 +99,13 @@ const config: Config = {
         },
       },
       minHeight: {
-        'touch': '44px',
+        touch: '44px',
       },
       minWidth: {
-        'touch': '44px',
+        touch: '44px',
       },
     },
   },
   plugins: [],
-}
-export default config
+};
+export default config;
