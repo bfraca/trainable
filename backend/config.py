@@ -61,6 +61,7 @@ class Settings(BaseSettings):
     # -- Data explorer --
     query_default_limit: int = 100
     query_max_limit: int = 1000
+    query_timeout_seconds: int = 30  # Per-query DuckDB timeout
     preview_default_limit: int = 50
 
     # -- Logging --
