@@ -16,6 +16,7 @@ import asyncio
 import io
 import logging
 import re
+import threading
 
 import duckdb
 import pyarrow.parquet as pq
@@ -51,9 +52,6 @@ _FORBIDDEN_FUNCTIONS = re.compile(
     r"|s3_get|s3_put|write_csv|write_parquet|current_setting)\s*\(",
     re.IGNORECASE,
 )
-
-# Allowed table names — prevents users from referencing arbitrary identifiers
-_ALLOWED_TABLES = frozenset({"train", "val", "test", "all_data"})
 
 
 def _validate_query(sql: str) -> None:
@@ -110,10 +108,14 @@ async def query_prep_data(session_id: str, body: QueryRequest):
 
     timeout_sec = settings.query_timeout_seconds
 
+    # Keep a reference to the connection so we can interrupt it on timeout
+    con_holder: list[duckdb.DuckDBPyConnection] = []
+
     def _blocking():
         reload_volume()
         data_dir = f"/sessions/{session_id}/prep/data"
         con = duckdb.connect(":memory:")
+        con_holder.append(con)
         try:
             for split in ["train", "val", "test"]:
                 path = f"{data_dir}/{split}.parquet"
@@ -149,9 +151,14 @@ async def query_prep_data(session_id: str, body: QueryRequest):
         finally:
             con.close()
 
+    # Schedule a timer to interrupt the DuckDB connection on timeout
+    timer = threading.Timer(
+        timeout_sec, lambda: con_holder[0].interrupt() if con_holder else None
+    )
+    timer.start()
     try:
-        return await asyncio.wait_for(asyncio.to_thread(_blocking), timeout=timeout_sec)
-    except asyncio.TimeoutError:
+        return await asyncio.to_thread(_blocking)
+    except duckdb.InterruptException:
         raise HTTPException(
             status_code=408, detail=f"Query timed out after {timeout_sec}s"
         )
@@ -162,6 +169,8 @@ async def query_prep_data(session_id: str, body: QueryRequest):
     except Exception as e:
         logger.exception("Unexpected error in query_prep_data")
         raise HTTPException(status_code=400, detail=f"Query error: {e}")
+    finally:
+        timer.cancel()
 
 
 @router.get("/sessions/{session_id}/prep/preview")
