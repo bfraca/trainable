@@ -52,6 +52,7 @@ export default function ExperimentPage() {
   const [sessionState, setSessionState] = useState('created');
   const [loading, setLoading] = useState(true);
   const [sseConnected, setSseConnected] = useState(false);
+  const [reconnectingIn, setReconnectingIn] = useState<number | null>(null);
 
   // Train config modal
   const [showTrainConfig, setShowTrainConfig] = useState(false);
@@ -313,8 +314,13 @@ export default function ExperimentPage() {
       // Use the shared SSE utility — single source of truth for connection logic
       const disconnect = connectSSEUtil(sid, {
         onEvent: handleEvent,
-        onOpen: () => setSseConnected(true),
+        onOpen: () => {
+          setSseConnected(true);
+          setReconnectingIn(null);
+        },
         onError: () => setSseConnected(false),
+        onReconnecting: (ms) => setReconnectingIn(ms),
+        onReconnected: () => setReconnectingIn(null),
       });
       // Store disconnect fn so we can close from handleStop / cleanup
       sseRef.current = { close: disconnect } as EventSource;
@@ -665,7 +671,27 @@ export default function ExperimentPage() {
         >
           <PanelRightOpen className="w-4 h-4" />
         </button>
-        <div className={`w-2 h-2 rounded-full ${sseConnected ? 'bg-green-500' : 'bg-red-500'}`} />
+        <div className="flex items-center gap-1.5">
+          {reconnectingIn !== null && (
+            <span className="text-xs text-yellow-400 animate-pulse">Reconnecting...</span>
+          )}
+          <div
+            className={`w-2 h-2 rounded-full ${
+              sseConnected
+                ? 'bg-green-500'
+                : reconnectingIn !== null
+                  ? 'bg-yellow-500 animate-pulse'
+                  : 'bg-red-500'
+            }`}
+            title={
+              sseConnected
+                ? 'Connected'
+                : reconnectingIn !== null
+                  ? `Reconnecting in ${Math.round(reconnectingIn / 1000)}s`
+                  : 'Disconnected'
+            }
+          />
+        </div>
       </header>
 
       {/* Main area — chat + canvas side by side */}
