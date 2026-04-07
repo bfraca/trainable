@@ -23,8 +23,11 @@ import {
   GripVertical,
   Plus,
 } from 'lucide-react';
+import dynamic from 'next/dynamic';
 import StageNav from '@/components/StageNav';
-import TrainConfigModal from '@/components/TrainConfigModal';
+
+// Lazy-load TrainConfigModal — only rendered when user starts training
+const TrainConfigModal = dynamic(() => import('@/components/TrainConfigModal'));
 
 import { connectSSE as connectSSEUtil } from '@/lib/sse';
 import { ChatItem, NEXT_STAGE } from './types';
