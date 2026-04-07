@@ -108,7 +108,9 @@ async def query_prep_data(session_id: str, body: QueryRequest):
 
     timeout_sec = settings.query_timeout_seconds
 
-    # Keep a reference to the connection so we can interrupt it on timeout
+    # Shared holders so _blocking() can expose the timer & connection for
+    # cleanup by the outer scope, and the timer can reach the connection.
+    timer_holder: list[threading.Timer] = []
     con_holder: list[duckdb.DuckDBPyConnection] = []
 
     def _blocking():
@@ -116,6 +118,13 @@ async def query_prep_data(session_id: str, body: QueryRequest):
         data_dir = f"/sessions/{session_id}/prep/data"
         con = duckdb.connect(":memory:")
         con_holder.append(con)
+
+        # Start the timeout timer *after* the connection exists so the
+        # interrupt callback can never find an empty con_holder.
+        timer = threading.Timer(timeout_sec, lambda: con.interrupt())
+        timer_holder.append(timer)
+        timer.start()
+
         try:
             for split in ["train", "val", "test"]:
                 path = f"{data_dir}/{split}.parquet"
@@ -149,13 +158,9 @@ async def query_prep_data(session_id: str, body: QueryRequest):
                 "tables_available": tables,
             }
         finally:
+            timer.cancel()
             con.close()
 
-    # Schedule a timer to interrupt the DuckDB connection on timeout
-    timer = threading.Timer(
-        timeout_sec, lambda: con_holder[0].interrupt() if con_holder else None
-    )
-    timer.start()
     try:
         return await asyncio.to_thread(_blocking)
     except duckdb.InterruptException:
@@ -170,7 +175,10 @@ async def query_prep_data(session_id: str, body: QueryRequest):
         logger.exception("Unexpected error in query_prep_data")
         raise HTTPException(status_code=400, detail=f"Query error: {e}")
     finally:
-        timer.cancel()
+        # Belt-and-suspenders: cancel the timer if _blocking() raised
+        # before reaching its own finally block.
+        if timer_holder:
+            timer_holder[0].cancel()
 
 
 @router.get("/sessions/{session_id}/prep/preview")
