@@ -23,10 +23,16 @@ from services.broadcaster import broadcaster
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter()
+router = APIRouter(tags=["Sessions"])
 
 
-@router.post("/experiments/{experiment_id}/sessions")
+@router.post(
+    "/experiments/{experiment_id}/sessions",
+    summary="Create a new session",
+    description="Creates a new session for an experiment. Each session tracks one "
+    "run through the EDA → Prep → Train pipeline. Raises 404 if the experiment "
+    "does not exist.",
+)
 async def create_session(experiment_id: str, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Experiment).where(Experiment.id == experiment_id))
     if not result.scalar_one_or_none():
@@ -38,7 +44,13 @@ async def create_session(experiment_id: str, db: AsyncSession = Depends(get_db))
     return session.to_dict()
 
 
-@router.get("/sessions/{session_id}")
+@router.get(
+    "/sessions/{session_id}",
+    summary="Get session details",
+    description="Returns a session with its experiment, messages, artifacts, and "
+    "processed dataset metadata. This is the primary endpoint for loading the "
+    "experiment detail page.",
+)
 async def get_session(session_id: str, db: AsyncSession = Depends(get_db)):
     result = await db.execute(
         select(SessionModel)
@@ -65,7 +77,14 @@ async def get_session(session_id: str, db: AsyncSession = Depends(get_db)):
     }
 
 
-@router.post("/sessions/{session_id}/messages")
+@router.post(
+    "/sessions/{session_id}/messages",
+    summary="Send a message to the session",
+    description="Adds a user message to the session. If `run_agent` is true in the "
+    "request body, the AI agent is triggered to process the message in the context "
+    "of the current stage (EDA/Prep/Train). Any previously running agent is silently "
+    "aborted first.",
+)
 async def send_message(
     session_id: str,
     body: MessageCreate,
@@ -153,7 +172,11 @@ def _infer_stage(state: str) -> str:
     return "eda"
 
 
-@router.get("/sessions/{session_id}/messages")
+@router.get(
+    "/sessions/{session_id}/messages",
+    summary="List session messages",
+    description="Returns all messages for a session in chronological order.",
+)
 async def get_messages(session_id: str, db: AsyncSession = Depends(get_db)):
     result = await db.execute(
         select(Message).where(Message.session_id == session_id).order_by(Message.id)
@@ -161,7 +184,13 @@ async def get_messages(session_id: str, db: AsyncSession = Depends(get_db)):
     return [m.to_dict() for m in result.scalars().all()]
 
 
-@router.post("/sessions/{session_id}/abort")
+@router.post(
+    "/sessions/{session_id}/abort",
+    summary="Abort a running agent",
+    description="Cancels the currently running AI agent task for this session and "
+    "sets the session state to 'cancelled'. Returns `{status: 'not_running'}` if "
+    "no agent is active.",
+)
 async def abort_session(session_id: str, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(SessionModel).where(SessionModel.id == session_id))
     session = result.scalar_one_or_none()
@@ -176,7 +205,14 @@ async def abort_session(session_id: str, db: AsyncSession = Depends(get_db)):
     return {"status": "not_running"}
 
 
-@router.post("/sessions/{session_id}/stages/{stage}/start")
+@router.post(
+    "/sessions/{session_id}/stages/{stage}/start",
+    summary="Start a pipeline stage",
+    description="Launches the AI agent for the given stage (eda, prep, or train). "
+    "Enforces stage prerequisites: EDA can only start from 'created'/'failed'/'cancelled', "
+    "Prep requires 'eda_done', Train requires 'prep_done'. Returns 409 if an agent "
+    "is already running. Rate-limited to prevent abuse.",
+)
 @limiter.limit(settings.rate_limit_agent_start)
 async def start_stage(
     request: Request,
@@ -281,13 +317,24 @@ async def start_stage(
     return {"status": "started", "state": f"{stage}_running"}
 
 
-@router.get("/sessions/{session_id}/artifacts")
+@router.get(
+    "/sessions/{session_id}/artifacts",
+    summary="List session artifacts",
+    description="Returns all artifacts (generated files, charts, reports) produced "
+    "by agent runs within this session.",
+)
 async def get_artifacts(session_id: str, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Artifact).where(Artifact.session_id == session_id))
     return [a.to_dict() for a in result.scalars().all()]
 
 
-@router.get("/sessions/{session_id}/metrics")
+@router.get(
+    "/sessions/{session_id}/metrics",
+    summary="List session metrics",
+    description="Returns training/evaluation metrics recorded during agent runs. "
+    "Optionally filter by stage (eda/prep/train) and metric name. Results are "
+    "ordered by step number.",
+)
 async def get_metrics(
     session_id: str,
     stage: Optional[str] = None,
