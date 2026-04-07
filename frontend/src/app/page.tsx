@@ -26,6 +26,7 @@ import { useToast } from '@/components/Toast';
 import StatsCard from './components/StatsCard';
 import ExperimentCard from './components/ExperimentCard';
 import ExperimentTable from './components/ExperimentTable';
+import ErrorBoundary from '@/components/ErrorBoundary';
 
 type ViewMode = 'cards' | 'table';
 
@@ -189,244 +190,246 @@ export default function HomePage() {
       </header>
 
       {/* Main */}
-      <main id="main-content" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-        <div className="space-y-6">
-          {/* Page header */}
-          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-            <div>
-              <h1 className="text-2xl font-bold text-white">Dashboard</h1>
-              <p className="mt-1 text-sm text-gray-400">Manage and monitor your ML experiments</p>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="flex items-center bg-surface-elevated rounded-lg border border-surface-border p-0.5">
-                <button
-                  onClick={() => setViewMode('cards')}
-                  className={`p-1.5 rounded-md transition-colors ${viewMode === 'cards' ? 'bg-surface-hover text-white' : 'text-gray-500 hover:text-gray-300'}`}
-                  title="Card view"
-                >
-                  <LayoutGrid className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => setViewMode('table')}
-                  className={`p-1.5 rounded-md transition-colors ${viewMode === 'table' ? 'bg-surface-hover text-white' : 'text-gray-500 hover:text-gray-300'}`}
-                  title="Table view"
-                >
-                  <TableProperties className="w-4 h-4" />
-                </button>
+      <ErrorBoundary panelName="Dashboard">
+        <main id="main-content" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+          <div className="space-y-6">
+            {/* Page header */}
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+              <div>
+                <h1 className="text-2xl font-bold text-white">Dashboard</h1>
+                <p className="mt-1 text-sm text-gray-400">Manage and monitor your ML experiments</p>
               </div>
-              <button
-                onClick={() => setShowCreate(true)}
-                className="inline-flex items-center justify-center px-4 py-2.5 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 transition-colors"
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                New Experiment
-              </button>
-            </div>
-          </div>
-
-          {/* Stats */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div
-              className="animate-fade-in"
-              style={{ animationDelay: '0ms', animationFillMode: 'both' }}
-            >
-              <StatsCard
-                icon={Cpu}
-                label="Total Experiments"
-                value={experiments.length}
-                color="bg-gray-600"
-              />
-            </div>
-            <div
-              className="animate-fade-in"
-              style={{ animationDelay: '50ms', animationFillMode: 'both' }}
-            >
-              <StatsCard icon={Zap} label="Running" value={runningCount} color="bg-blue-500" />
-            </div>
-            <div
-              className="animate-fade-in"
-              style={{ animationDelay: '100ms', animationFillMode: 'both' }}
-            >
-              <StatsCard
-                icon={CheckCircle2}
-                label="Completed"
-                value={completedCount}
-                color="bg-emerald-500"
-              />
-            </div>
-          </div>
-
-          {/* Error */}
-          {error && (
-            <div className="p-4 rounded-lg border bg-amber-900/30 border-amber-800">
-              <div className="flex items-start gap-3">
-                <div className="p-2 rounded-lg bg-amber-900/50">
-                  <WifiOff className="w-5 h-5 text-amber-400" />
-                </div>
-                <div className="flex-1">
-                  <h3 className="font-medium text-amber-300">{error.message}</h3>
+              <div className="flex items-center gap-2">
+                <div className="flex items-center bg-surface-elevated rounded-lg border border-surface-border p-0.5">
                   <button
-                    onClick={() => fetchExperiments(true)}
-                    disabled={retrying}
-                    className="mt-3 inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-lg bg-amber-800/50 text-amber-200 hover:bg-amber-800/70 disabled:opacity-50"
+                    onClick={() => setViewMode('cards')}
+                    className={`p-1.5 rounded-md transition-colors ${viewMode === 'cards' ? 'bg-surface-hover text-white' : 'text-gray-500 hover:text-gray-300'}`}
+                    title="Card view"
                   >
-                    {retrying ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Retrying...
-                      </>
-                    ) : (
-                      <>
-                        <RefreshCw className="w-4 h-4 mr-2" />
-                        Try Again
-                      </>
-                    )}
+                    <LayoutGrid className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => setViewMode('table')}
+                    className={`p-1.5 rounded-md transition-colors ${viewMode === 'table' ? 'bg-surface-hover text-white' : 'text-gray-500 hover:text-gray-300'}`}
+                    title="Table view"
+                  >
+                    <TableProperties className="w-4 h-4" />
                   </button>
                 </div>
-              </div>
-            </div>
-          )}
-
-          {/* Running indicator */}
-          {runningCount > 0 && (
-            <div className="flex items-center justify-center text-sm text-blue-400 bg-blue-900/30 px-4 py-2 rounded-lg border border-blue-800">
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              {runningCount} experiment{runningCount > 1 ? 's' : ''} running - auto-refreshing
-            </div>
-          )}
-
-          {/* Selection toolbar */}
-          {selectedIds.size > 0 && (
-            <div className="flex items-center justify-between bg-primary-900/30 border border-primary-700 rounded-lg px-4 py-2.5 animate-fade-in">
-              <div className="flex items-center gap-3">
-                <span className="text-sm font-medium text-primary-300">
-                  {selectedIds.size} selected
-                </span>
                 <button
-                  onClick={clearSelection}
-                  className="text-xs text-gray-400 hover:text-gray-200 transition-colors inline-flex items-center gap-1"
+                  onClick={() => setShowCreate(true)}
+                  className="inline-flex items-center justify-center px-4 py-2.5 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 transition-colors"
                 >
-                  <X className="w-3 h-3" />
-                  Clear
+                  <Plus className="w-4 h-4 mr-2" />
+                  New Experiment
                 </button>
               </div>
-              <button
-                onClick={() => setBulkDeleteTarget(true)}
-                className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-red-300 bg-red-900/40 hover:bg-red-900/60 border border-red-800 rounded-lg transition-colors"
-              >
-                <Trash2 className="w-3.5 h-3.5 mr-1.5" />
-                Delete selected
-              </button>
             </div>
-          )}
 
-          {/* Experiments list */}
-          {loading ? (
-            viewMode === 'cards' ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {[1, 2, 3].map((i) => (
-                  <div
-                    key={i}
-                    className="h-44 bg-surface-elevated rounded-xl border border-surface-border animate-pulse"
-                  />
-                ))}
+            {/* Stats */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div
+                className="animate-fade-in"
+                style={{ animationDelay: '0ms', animationFillMode: 'both' }}
+              >
+                <StatsCard
+                  icon={Cpu}
+                  label="Total Experiments"
+                  value={experiments.length}
+                  color="bg-gray-600"
+                />
               </div>
+              <div
+                className="animate-fade-in"
+                style={{ animationDelay: '50ms', animationFillMode: 'both' }}
+              >
+                <StatsCard icon={Zap} label="Running" value={runningCount} color="bg-blue-500" />
+              </div>
+              <div
+                className="animate-fade-in"
+                style={{ animationDelay: '100ms', animationFillMode: 'both' }}
+              >
+                <StatsCard
+                  icon={CheckCircle2}
+                  label="Completed"
+                  value={completedCount}
+                  color="bg-emerald-500"
+                />
+              </div>
+            </div>
+
+            {/* Error */}
+            {error && (
+              <div className="p-4 rounded-lg border bg-amber-900/30 border-amber-800">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 rounded-lg bg-amber-900/50">
+                    <WifiOff className="w-5 h-5 text-amber-400" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-medium text-amber-300">{error.message}</h3>
+                    <button
+                      onClick={() => fetchExperiments(true)}
+                      disabled={retrying}
+                      className="mt-3 inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-lg bg-amber-800/50 text-amber-200 hover:bg-amber-800/70 disabled:opacity-50"
+                    >
+                      {retrying ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Retrying...
+                        </>
+                      ) : (
+                        <>
+                          <RefreshCw className="w-4 h-4 mr-2" />
+                          Try Again
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Running indicator */}
+            {runningCount > 0 && (
+              <div className="flex items-center justify-center text-sm text-blue-400 bg-blue-900/30 px-4 py-2 rounded-lg border border-blue-800">
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                {runningCount} experiment{runningCount > 1 ? 's' : ''} running - auto-refreshing
+              </div>
+            )}
+
+            {/* Selection toolbar */}
+            {selectedIds.size > 0 && (
+              <div className="flex items-center justify-between bg-primary-900/30 border border-primary-700 rounded-lg px-4 py-2.5 animate-fade-in">
+                <div className="flex items-center gap-3">
+                  <span className="text-sm font-medium text-primary-300">
+                    {selectedIds.size} selected
+                  </span>
+                  <button
+                    onClick={clearSelection}
+                    className="text-xs text-gray-400 hover:text-gray-200 transition-colors inline-flex items-center gap-1"
+                  >
+                    <X className="w-3 h-3" />
+                    Clear
+                  </button>
+                </div>
+                <button
+                  onClick={() => setBulkDeleteTarget(true)}
+                  className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-red-300 bg-red-900/40 hover:bg-red-900/60 border border-red-800 rounded-lg transition-colors"
+                >
+                  <Trash2 className="w-3.5 h-3.5 mr-1.5" />
+                  Delete selected
+                </button>
+              </div>
+            )}
+
+            {/* Experiments list */}
+            {loading ? (
+              viewMode === 'cards' ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {[1, 2, 3].map((i) => (
+                    <div
+                      key={i}
+                      className="h-44 bg-surface-elevated rounded-xl border border-surface-border animate-pulse"
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="bg-surface-elevated rounded-xl border border-surface-border animate-pulse h-64" />
+              )
+            ) : experiments.length === 0 ? (
+              <div className="bg-surface-elevated rounded-xl border border-surface-border p-12 text-center shadow-sm animate-fade-in">
+                <div className="mx-auto w-16 h-16 bg-neutral-800 rounded-full flex items-center justify-center mb-4">
+                  <Database className="w-8 h-8 text-gray-500" />
+                </div>
+                <h3 className="text-lg font-medium text-white mb-2">No experiments yet</h3>
+                <p className="text-sm text-gray-400 mb-6 max-w-sm mx-auto">
+                  Get started by creating your first ML experiment. Upload a dataset and let the AI
+                  agent guide you through the process.
+                </p>
+                <button
+                  onClick={() => setShowCreate(true)}
+                  className="inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 transition-colors"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Create your first experiment
+                </button>
+              </div>
+            ) : viewMode === 'table' ? (
+              <ExperimentTable
+                experiments={paginatedExperiments}
+                onClick={(exp) => {
+                  const sid = exp.latest_session_id;
+                  window.location.href = `/experiments/${exp.id}${sid ? `?session=${sid}` : ''}`;
+                }}
+                onDelete={(exp) => setDeleteTarget(exp)}
+                selectedIds={selectedIds}
+                onToggleSelect={toggleSelect}
+                onToggleAll={toggleAllOnPage}
+              />
             ) : (
-              <div className="bg-surface-elevated rounded-xl border border-surface-border animate-pulse h-64" />
-            )
-          ) : experiments.length === 0 ? (
-            <div className="bg-surface-elevated rounded-xl border border-surface-border p-12 text-center shadow-sm animate-fade-in">
-              <div className="mx-auto w-16 h-16 bg-neutral-800 rounded-full flex items-center justify-center mb-4">
-                <Database className="w-8 h-8 text-gray-500" />
-              </div>
-              <h3 className="text-lg font-medium text-white mb-2">No experiments yet</h3>
-              <p className="text-sm text-gray-400 mb-6 max-w-sm mx-auto">
-                Get started by creating your first ML experiment. Upload a dataset and let the AI
-                agent guide you through the process.
-              </p>
-              <button
-                onClick={() => setShowCreate(true)}
-                className="inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 transition-colors"
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Create your first experiment
-              </button>
-            </div>
-          ) : viewMode === 'table' ? (
-            <ExperimentTable
-              experiments={paginatedExperiments}
-              onClick={(exp) => {
-                const sid = exp.latest_session_id;
-                window.location.href = `/experiments/${exp.id}${sid ? `?session=${sid}` : ''}`;
-              }}
-              onDelete={(exp) => setDeleteTarget(exp)}
-              selectedIds={selectedIds}
-              onToggleSelect={toggleSelect}
-              onToggleAll={toggleAllOnPage}
-            />
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {paginatedExperiments.map((experiment, index) => (
-                <div
-                  key={experiment.id}
-                  className="animate-fade-in"
-                  style={{ animationDelay: `${index * 50}ms`, animationFillMode: 'both' }}
-                >
-                  <ExperimentCard
-                    experiment={experiment}
-                    onClick={() => {
-                      const sid = experiment.latest_session_id;
-                      window.location.href = `/experiments/${experiment.id}${sid ? `?session=${sid}` : ''}`;
-                    }}
-                    onDelete={() => setDeleteTarget(experiment)}
-                    selected={selectedIds.has(experiment.id)}
-                    onToggleSelect={() => toggleSelect(experiment.id)}
-                  />
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Pagination */}
-          {!loading && experiments.length > PAGE_SIZE && (
-            <div className="flex items-center justify-between pt-2">
-              <span className="text-sm text-gray-500">
-                Showing {page * PAGE_SIZE + 1}\u2013
-                {Math.min((page + 1) * PAGE_SIZE, experiments.length)} of {experiments.length}
-              </span>
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => setPage((p) => Math.max(0, p - 1))}
-                  disabled={page === 0}
-                  className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-surface-hover disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-gray-400 transition-colors"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </button>
-                {Array.from({ length: totalPages }, (_, i) => (
-                  <button
-                    key={i}
-                    onClick={() => setPage(i)}
-                    className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors ${
-                      i === page
-                        ? 'bg-primary-600 text-white'
-                        : 'text-gray-400 hover:text-white hover:bg-surface-hover'
-                    }`}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {paginatedExperiments.map((experiment, index) => (
+                  <div
+                    key={experiment.id}
+                    className="animate-fade-in"
+                    style={{ animationDelay: `${index * 50}ms`, animationFillMode: 'both' }}
                   >
-                    {i + 1}
-                  </button>
+                    <ExperimentCard
+                      experiment={experiment}
+                      onClick={() => {
+                        const sid = experiment.latest_session_id;
+                        window.location.href = `/experiments/${experiment.id}${sid ? `?session=${sid}` : ''}`;
+                      }}
+                      onDelete={() => setDeleteTarget(experiment)}
+                      selected={selectedIds.has(experiment.id)}
+                      onToggleSelect={() => toggleSelect(experiment.id)}
+                    />
+                  </div>
                 ))}
-                <button
-                  onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
-                  disabled={page >= totalPages - 1}
-                  className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-surface-hover disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-gray-400 transition-colors"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </button>
               </div>
-            </div>
-          )}
-        </div>
-      </main>
+            )}
+
+            {/* Pagination */}
+            {!loading && experiments.length > PAGE_SIZE && (
+              <div className="flex items-center justify-between pt-2">
+                <span className="text-sm text-gray-500">
+                  Showing {page * PAGE_SIZE + 1}\u2013
+                  {Math.min((page + 1) * PAGE_SIZE, experiments.length)} of {experiments.length}
+                </span>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setPage((p) => Math.max(0, p - 1))}
+                    disabled={page === 0}
+                    className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-surface-hover disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-gray-400 transition-colors"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  {Array.from({ length: totalPages }, (_, i) => (
+                    <button
+                      key={i}
+                      onClick={() => setPage(i)}
+                      className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors ${
+                        i === page
+                          ? 'bg-primary-600 text-white'
+                          : 'text-gray-400 hover:text-white hover:bg-surface-hover'
+                      }`}
+                    >
+                      {i + 1}
+                    </button>
+                  ))}
+                  <button
+                    onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+                    disabled={page >= totalPages - 1}
+                    className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-surface-hover disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-gray-400 transition-colors"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </main>
+      </ErrorBoundary>
 
       {showCreate && (
         <CreateModal

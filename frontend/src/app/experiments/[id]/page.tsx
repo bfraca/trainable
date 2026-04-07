@@ -36,6 +36,7 @@ import {
 } from './utils/fileTree';
 import WorkspaceSidebar from './components/WorkspaceSidebar';
 import renderChatItem from './components/ChatItemRenderer';
+import ErrorBoundary from '@/components/ErrorBoundary';
 
 export default function ExperimentPage() {
   const params = useParams();
@@ -672,72 +673,76 @@ export default function ExperimentPage() {
       <PanelGroup direction="horizontal" className="flex-1">
         {/* Chat panel */}
         <Panel defaultSize={canvasOpen ? 25 : 100} minSize={15}>
-          <div className="h-full flex flex-col min-w-0">
-            <div className="flex-1 overflow-y-auto px-4 py-4">
-              <div className={`mx-auto w-full space-y-4 ${canvasOpen ? 'max-w-3xl' : 'max-w-5xl'}`}>
-                {chatItems.map((item) => renderChatItem(item))}
+          <ErrorBoundary panelName="Chat">
+            <div className="h-full flex flex-col min-w-0">
+              <div className="flex-1 overflow-y-auto px-4 py-4">
+                <div
+                  className={`mx-auto w-full space-y-4 ${canvasOpen ? 'max-w-3xl' : 'max-w-5xl'}`}
+                >
+                  {chatItems.map((item) => renderChatItem(item))}
 
-                {isRunning &&
-                  chatItems.length > 0 &&
-                  chatItems[chatItems.length - 1]?.type === 'status' && (
-                    <div className="flex gap-3 animate-fade-in">
-                      <div className="w-7 h-7 rounded-full bg-emerald-500/20 flex items-center justify-center shrink-0">
-                        <Bot className="w-3.5 h-3.5 text-emerald-400" />
+                  {isRunning &&
+                    chatItems.length > 0 &&
+                    chatItems[chatItems.length - 1]?.type === 'status' && (
+                      <div className="flex gap-3 animate-fade-in">
+                        <div className="w-7 h-7 rounded-full bg-emerald-500/20 flex items-center justify-center shrink-0">
+                          <Bot className="w-3.5 h-3.5 text-emerald-400" />
+                        </div>
+                        <div className="flex items-center gap-2 text-sm text-gray-500">
+                          <Loader2 className="w-4 h-4 animate-spin text-primary-500" />
+                          Thinking...
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2 text-sm text-gray-500">
-                        <Loader2 className="w-4 h-4 animate-spin text-primary-500" />
-                        Thinking...
-                      </div>
-                    </div>
-                  )}
-                <div ref={bottomRef} />
+                    )}
+                  <div ref={bottomRef} />
+                </div>
               </div>
-            </div>
 
-            {/* Input */}
-            <div className="border-t border-surface-border bg-surface px-4 py-3">
-              <div className={`mx-auto ${canvasOpen ? 'max-w-3xl' : 'max-w-5xl'}`}>
-                <div className="flex items-center gap-1 bg-surface-elevated border border-surface-border rounded-full px-2 py-1.5 focus-within:border-primary-500 transition-colors">
-                  <button
-                    type="button"
-                    className="p-2 rounded-full hover:bg-neutral-700 transition-colors text-gray-400 hover:text-gray-300 shrink-0"
-                    title="Attach file"
-                  >
-                    <Plus className="w-4 h-4" />
-                  </button>
-                  <input
-                    type="text"
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    onKeyDown={(e) =>
-                      e.key === 'Enter' &&
-                      !e.shiftKey &&
-                      (isRunning && !input.trim() ? handleStop() : handleSend())
-                    }
-                    placeholder="Ask anything"
-                    className="flex-1 bg-transparent text-white text-sm placeholder-gray-500 focus:outline-none py-1.5"
-                  />
-                  {isRunning && !input.trim() ? (
+              {/* Input */}
+              <div className="border-t border-surface-border bg-surface px-4 py-3">
+                <div className={`mx-auto ${canvasOpen ? 'max-w-3xl' : 'max-w-5xl'}`}>
+                  <div className="flex items-center gap-1 bg-surface-elevated border border-surface-border rounded-full px-2 py-1.5 focus-within:border-primary-500 transition-colors">
                     <button
-                      onClick={handleStop}
-                      className="p-2 bg-red-600 hover:bg-red-700 rounded-full transition-colors shrink-0"
-                      title="Stop agent"
+                      type="button"
+                      className="p-2 rounded-full hover:bg-neutral-700 transition-colors text-gray-400 hover:text-gray-300 shrink-0"
+                      title="Attach file"
                     >
-                      <Square className="w-4 h-4 text-white" />
+                      <Plus className="w-4 h-4" />
                     </button>
-                  ) : (
-                    <button
-                      onClick={handleSend}
-                      disabled={!input.trim()}
-                      className="p-2 bg-primary-600 hover:bg-primary-700 disabled:opacity-30 rounded-full transition-colors shrink-0"
-                    >
-                      <Send className="w-4 h-4 text-white" />
-                    </button>
-                  )}
+                    <input
+                      type="text"
+                      value={input}
+                      onChange={(e) => setInput(e.target.value)}
+                      onKeyDown={(e) =>
+                        e.key === 'Enter' &&
+                        !e.shiftKey &&
+                        (isRunning && !input.trim() ? handleStop() : handleSend())
+                      }
+                      placeholder="Ask anything"
+                      className="flex-1 bg-transparent text-white text-sm placeholder-gray-500 focus:outline-none py-1.5"
+                    />
+                    {isRunning && !input.trim() ? (
+                      <button
+                        onClick={handleStop}
+                        className="p-2 bg-red-600 hover:bg-red-700 rounded-full transition-colors shrink-0"
+                        title="Stop agent"
+                      >
+                        <Square className="w-4 h-4 text-white" />
+                      </button>
+                    ) : (
+                      <button
+                        onClick={handleSend}
+                        disabled={!input.trim()}
+                        className="p-2 bg-primary-600 hover:bg-primary-700 disabled:opacity-30 rounded-full transition-colors shrink-0"
+                      >
+                        <Send className="w-4 h-4 text-white" />
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+          </ErrorBoundary>
         </Panel>
 
         {/* Resize handle + Workspace sidebar */}
@@ -749,18 +754,20 @@ export default function ExperimentPage() {
               </div>
             </PanelResizeHandle>
             <Panel defaultSize={75} minSize={30}>
-              <WorkspaceSidebar
-                experimentId={experimentId}
-                sessionId={sessionId}
-                canvasContent={canvasContent}
-                canvasTitle={canvasTitle}
-                generatedFiles={generatedFiles}
-                fileTree={fileTree}
-                metricPoints={metricPoints}
-                chartConfig={chartConfig}
-                sessionState={sessionState}
-                onClose={() => setCanvasOpen(false)}
-              />
+              <ErrorBoundary panelName="Workspace">
+                <WorkspaceSidebar
+                  experimentId={experimentId}
+                  sessionId={sessionId}
+                  canvasContent={canvasContent}
+                  canvasTitle={canvasTitle}
+                  generatedFiles={generatedFiles}
+                  fileTree={fileTree}
+                  metricPoints={metricPoints}
+                  chartConfig={chartConfig}
+                  sessionState={sessionState}
+                  onClose={() => setCanvasOpen(false)}
+                />
+              </ErrorBoundary>
             </Panel>
           </>
         )}
