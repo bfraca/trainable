@@ -29,6 +29,7 @@ export default function FileViewer({ filePath, sessionId }: { filePath: string; 
   useEffect(() => {
     if (isImage || isBinary) {
       setLoading(false);
+      setError(null);
       return;
     }
     setLoading(true);
