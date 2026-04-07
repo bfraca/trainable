@@ -103,3 +103,36 @@ async def test_docs_bypass_auth(auth_client):
     client = await auth_client("secret-key-123")
     resp = await client.get("/openapi.json")
     assert resp.status_code == 200
+
+
+# --------------------------------------------------------------------------- #
+# Query parameter token fallback (for SSE / EventSource)
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.asyncio
+async def test_query_param_token_allows_request(auth_client):
+    """?token=<key> query param should authenticate (for SSE EventSource)."""
+    client = await auth_client("secret-key-123")
+    resp = await client.get("/api/experiments?token=secret-key-123")
+    assert resp.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_query_param_wrong_token_returns_401(auth_client):
+    """Wrong ?token= value → 401."""
+    client = await auth_client("secret-key-123")
+    resp = await client.get("/api/experiments?token=wrong-key")
+    assert resp.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_header_takes_precedence_over_query_param(auth_client):
+    """Authorization header is checked first; query param is fallback only."""
+    client = await auth_client("secret-key-123")
+    # Correct header + wrong query param → should pass (header wins)
+    resp = await client.get(
+        "/api/experiments?token=wrong-key",
+        headers={"Authorization": "Bearer secret-key-123"},
+    )
+    assert resp.status_code == 200

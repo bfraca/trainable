@@ -1,7 +1,9 @@
 """API-key authentication middleware.
 
 When ``API_KEY`` is set in the environment (or .env), every request must
-include a matching ``Authorization: Bearer <key>`` header.  Requests to
+include a matching ``Authorization: Bearer <key>`` header **or** pass the
+key via a ``?token=<key>`` query parameter (needed for SSE endpoints where
+the browser ``EventSource`` API cannot set custom headers).  Requests to
 the health-check and OpenAPI docs endpoints are always allowed through.
 
 If ``API_KEY`` is empty or unset the middleware is a no-op — the app
@@ -41,12 +43,13 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
         if request.url.path in _PUBLIC_PATHS:
             return await call_next(request)
 
-        # Check Authorization header
+        # Check Authorization header first, then fall back to ?token= query
+        # param (needed for SSE — browser EventSource cannot set headers).
         auth_header = request.headers.get("Authorization", "")
         if auth_header.startswith("Bearer "):
             token = auth_header[len("Bearer ") :]
         else:
-            token = ""
+            token = request.query_params.get("token", "")
 
         if not hmac.compare_digest(token, settings.api_key):
             logger.warning(
