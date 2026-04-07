@@ -1,11 +1,20 @@
 'use client';
 
 import { useState } from 'react';
-import { FileText, FolderOpen, BarChart3 } from 'lucide-react';
+import dynamic from 'next/dynamic';
+import { FileText, FolderOpen, BarChart3, Loader2 } from 'lucide-react';
 import { Artifact, MetricPoint, ChartConfig } from '@/lib/types';
 import ReportTab from './ReportTab';
 import FilesTab from './FilesTab';
-import MetricsTab from './MetricsTab';
+
+// Lazy-load MetricsTab — it pulls in recharts (~200 KB gzipped)
+const MetricsTab = dynamic(() => import('./MetricsTab'), {
+  loading: () => (
+    <div className="flex items-center justify-center p-8 text-gray-500">
+      <Loader2 className="w-5 h-5 animate-spin" />
+    </div>
+  ),
+});
 
 interface CanvasPanelProps {
   report: string;

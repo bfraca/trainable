@@ -1,21 +1,29 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import {
-  X,
-  FolderOpen,
-  BarChart3,
-  FileText,
-  ChevronRight,
-  Code2,
-} from 'lucide-react';
+import { X, FolderOpen, BarChart3, FileText, ChevronRight, Code2, Loader2 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import dynamic from 'next/dynamic';
 import { FileTreeNode, MetricPoint, ChartConfig } from '@/lib/types';
-import MetricsTab from '@/components/MetricsTab';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import FileTreeRow from './FileTreeRow';
-import FileViewer from './FileViewer';
+
+// Lazy-load heavy components — MetricsTab pulls in recharts, FileViewer pulls in react-syntax-highlighter
+const MetricsTab = dynamic(() => import('@/components/MetricsTab'), {
+  loading: () => (
+    <div className="flex items-center justify-center p-8 text-gray-500">
+      <Loader2 className="w-5 h-5 animate-spin" />
+    </div>
+  ),
+});
+const FileViewer = dynamic(() => import('./FileViewer'), {
+  loading: () => (
+    <div className="flex items-center justify-center p-8 text-gray-500">
+      <Loader2 className="w-5 h-5 animate-spin" />
+    </div>
+  ),
+});
 import { countFiles, fileBreadcrumb } from '../utils/fileTree';
 import { getBackendUrl, getFileIconInfo } from '../utils/helpers';
 

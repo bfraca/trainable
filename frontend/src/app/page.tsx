@@ -17,11 +17,14 @@ import {
   X,
   Database,
 } from 'lucide-react';
+import dynamic from 'next/dynamic';
 import { Experiment } from '@/lib/types';
 import { api } from '@/lib/api';
-import CreateModal from '@/components/CreateModal';
-import ConfirmModal from '@/components/ConfirmModal';
 import { useToast } from '@/components/Toast';
+
+// Lazy-load modals — only rendered when user triggers them
+const CreateModal = dynamic(() => import('@/components/CreateModal'));
+const ConfirmModal = dynamic(() => import('@/components/ConfirmModal'));
 
 import StatsCard from './components/StatsCard';
 import ExperimentCard from './components/ExperimentCard';
