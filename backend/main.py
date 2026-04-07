@@ -46,7 +46,6 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Trainable v2", lifespan=lifespan)
 app.add_exception_handler(Exception, generic_exception_handler)
-setup_rate_limiting(app)
 
 app.add_middleware(APIKeyMiddleware)
 app.add_middleware(
@@ -56,6 +55,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+# Rate limiting must be added last so it becomes the outermost middleware
+# (after CORS).  Execution order: CORS → SlowAPI → APIKey → route.
+# This ensures unauthenticated requests are rate-limited before reaching
+# APIKeyMiddleware, preventing brute-force / DoS without rate limits.
+setup_rate_limiting(app)
 
 app.include_router(experiments.router, prefix="/api")
 app.include_router(sessions.router, prefix="/api")
