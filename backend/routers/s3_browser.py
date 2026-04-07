@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Optional
 
@@ -24,8 +25,11 @@ class PresignRequest(BaseModel):
 @router.get("/buckets")
 async def list_buckets():
     try:
-        response = get_s3_client().list_buckets()
-        buckets = [b["Name"] for b in response.get("Buckets", [])]
+        def _blocking():
+            response = get_s3_client().list_buckets()
+            return [b["Name"] for b in response.get("Buckets", [])]
+
+        buckets = await asyncio.to_thread(_blocking)
         return {"buckets": buckets}
     except Exception as e:
         logger.error(f"S3 list_buckets: {e}")
@@ -39,7 +43,10 @@ async def list_objects(bucket: str, prefix: Optional[str] = ""):
         if prefix:
             params["Prefix"] = prefix
 
-        response = get_s3_client().list_objects_v2(**params)
+        def _blocking():
+            return get_s3_client().list_objects_v2(**params)
+
+        response = await asyncio.to_thread(_blocking)
 
         folders = [
             {"name": p["Prefix"].rstrip("/").split("/")[-1], "prefix": p["Prefix"]}
@@ -65,11 +72,14 @@ async def list_objects(bucket: str, prefix: Optional[str] = ""):
 @router.post("/presign")
 async def generate_presigned_url(req: PresignRequest):
     try:
-        url = get_s3_client().generate_presigned_url(
-            "put_object",
-            Params={"Bucket": req.bucket, "Key": req.key},
-            ExpiresIn=req.expires_in,
-        )
+        def _blocking():
+            return get_s3_client().generate_presigned_url(
+                "put_object",
+                Params={"Bucket": req.bucket, "Key": req.key},
+                ExpiresIn=req.expires_in,
+            )
+
+        url = await asyncio.to_thread(_blocking)
         # Replace internal endpoint with external one for browser access
         internal = settings.s3_endpoint
         external = get_s3_external_endpoint()
@@ -84,12 +94,16 @@ async def generate_presigned_url(req: PresignRequest):
 async def upload_file(bucket: str, key: str, file: UploadFile = File(...)):
     try:
         content = await file.read()
-        get_s3_client().put_object(
-            Bucket=bucket,
-            Key=key,
-            Body=content,
-            ContentType=file.content_type or "application/octet-stream",
-        )
+
+        def _blocking():
+            get_s3_client().put_object(
+                Bucket=bucket,
+                Key=key,
+                Body=content,
+                ContentType=file.content_type or "application/octet-stream",
+            )
+
+        await asyncio.to_thread(_blocking)
         return {
             "status": "uploaded",
             "bucket": bucket,
@@ -104,11 +118,14 @@ async def upload_file(bucket: str, key: str, file: UploadFile = File(...)):
 @router.get("/download")
 async def get_download_url(bucket: str, key: str):
     try:
-        url = get_s3_client().generate_presigned_url(
-            "get_object",
-            Params={"Bucket": bucket, "Key": key},
-            ExpiresIn=3600,
-        )
+        def _blocking():
+            return get_s3_client().generate_presigned_url(
+                "get_object",
+                Params={"Bucket": bucket, "Key": key},
+                ExpiresIn=3600,
+            )
+
+        url = await asyncio.to_thread(_blocking)
         internal = settings.s3_endpoint
         external = get_s3_external_endpoint()
         url = url.replace(internal, external)

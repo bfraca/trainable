@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import mimetypes
 import posixpath
@@ -42,15 +43,18 @@ async def list_files(path: str = "/"):
     """List files/dirs in Modal Volume at given path."""
     try:
         path = _validate_path(path)
-        vol = get_volume()
-        entries = []
-        for entry in vol.listdir(path, recursive=False):
-            entries.append(
+
+        def _blocking():
+            vol = get_volume()
+            return [
                 {
                     "path": entry.path,
                     "type": "file" if entry.type.name == "FILE" else "directory",
                 }
-            )
+                for entry in vol.listdir(path, recursive=False)
+            ]
+
+        entries = await asyncio.to_thread(_blocking)
         return {"path": path, "entries": entries}
     except Exception as e:
         logger.error(f"list_files error: {e}")
@@ -62,8 +66,12 @@ async def read_file(path: str):
     """Read a text file from Modal Volume."""
     try:
         path = _validate_path(path)
-        vol = get_volume()
-        data = b"".join(vol.read_file(path))
+
+        def _blocking():
+            vol = get_volume()
+            return b"".join(vol.read_file(path))
+
+        data = await asyncio.to_thread(_blocking)
         return {"path": path, "content": data.decode("utf-8", errors="replace")}
     except Exception as e:
         logger.error(f"read_file error: {e}")
@@ -75,8 +83,12 @@ async def raw_file(path: str):
     """Serve a raw file from Modal Volume (images, etc.)."""
     try:
         path = _validate_path(path)
-        vol = get_volume()
-        data = b"".join(vol.read_file(path))
+
+        def _blocking():
+            vol = get_volume()
+            return b"".join(vol.read_file(path))
+
+        data = await asyncio.to_thread(_blocking)
         mime, _ = mimetypes.guess_type(path)
         return Response(content=data, media_type=mime or "application/octet-stream")
     except Exception as e:
@@ -93,11 +105,13 @@ async def file_tree(root: str = "/"):
     """
     try:
         root = _validate_path(root)
-        vol = get_volume()
-        entries = list(vol.listdir(root, recursive=True))
+
+        def _blocking():
+            vol = get_volume()
+            return list(vol.listdir(root, recursive=True))
+
+        entries = await asyncio.to_thread(_blocking)
         tree = _build_tree(root, entries)
-        # Unwrap single-child directory chains at the top
-        # e.g. sessions > {uuid} > eda  →  just show eda at top level
         tree = _unwrap_tree(tree)
         tree["name"] = "workspace"
         return tree
