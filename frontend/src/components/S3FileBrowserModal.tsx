@@ -176,7 +176,12 @@ export default function S3FileBrowserModal({
   const breadcrumbs = currentPrefix.split('/').filter(Boolean);
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
+    <div
+      className="fixed inset-0 z-50 overflow-y-auto"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="s3-browser-modal-title"
+    >
       {/* Backdrop */}
       <div
         className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
@@ -192,10 +197,13 @@ export default function S3FileBrowserModal({
               <div className="w-8 h-8 bg-primary-900/50 rounded-lg flex items-center justify-center mr-3">
                 <Database className="w-4 h-4 text-primary-400" />
               </div>
-              <h2 className="text-lg font-semibold text-white">Browse S3</h2>
+              <h2 id="s3-browser-modal-title" className="text-lg font-semibold text-white">
+                Browse S3
+              </h2>
             </div>
             <button
               onClick={onClose}
+              aria-label="Close modal"
               className="p-2 text-gray-400 hover:text-white hover:bg-neutral-800 rounded-lg transition-colors"
             >
               <X className="w-5 h-5" />
@@ -208,6 +216,7 @@ export default function S3FileBrowserModal({
               <select
                 value={selectedBucket}
                 onChange={(e) => handleBucketChange(e.target.value)}
+                aria-label="Select S3 bucket"
                 className="px-3 py-1.5 text-sm bg-neutral-700 border border-neutral-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
               >
                 {buckets.map((bucket) => (

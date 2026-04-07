@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, DragEvent } from 'react';
+import { useState, useRef, useEffect, useCallback, DragEvent } from 'react';
 import {
   X,
   Upload,
@@ -75,6 +75,19 @@ export default function CreateModal({ onClose, onCreated }: CreateModalProps) {
   const fileRef = useRef<HTMLInputElement>(null);
   const folderRef = useRef<HTMLInputElement>(null);
   const resultRef = useRef<{ id: string; session_id: string } | null>(null);
+
+  // Close on Escape
+  const handleKeyDown = useCallback(
+    (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && phase === 'form' && !showS3Browser) onClose();
+    },
+    [onClose, phase, showS3Browser],
+  );
+
+  useEffect(() => {
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [handleKeyDown]);
 
   // Cycle through loading messages
   useEffect(() => {
@@ -158,7 +171,13 @@ export default function CreateModal({ onClose, onCreated }: CreateModalProps) {
 
   return (
     <>
-      <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+      <div
+        className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={!isLoading ? 'create-modal-title' : undefined}
+        aria-label={isLoading ? 'New Experiment' : undefined}
+      >
         <div
           className={`bg-surface-elevated border border-surface-border rounded-2xl w-full flex flex-col overflow-hidden transition-all duration-500 ease-in-out ${
             isLoading ? 'max-w-sm max-h-[280px]' : 'max-w-lg max-h-[90vh] animate-fade-in'
@@ -199,9 +218,12 @@ export default function CreateModal({ onClose, onCreated }: CreateModalProps) {
             <>
               {/* Header */}
               <div className="flex items-center justify-between px-6 py-4 border-b border-surface-border shrink-0">
-                <h2 className="text-lg font-semibold text-white">New Experiment</h2>
+                <h2 id="create-modal-title" className="text-lg font-semibold text-white">
+                  New Experiment
+                </h2>
                 <button
                   onClick={onClose}
+                  aria-label="Close modal"
                   className="p-1 hover:bg-surface-hover rounded-lg transition-colors"
                 >
                   <X className="w-5 h-5 text-gray-400" />
@@ -212,8 +234,14 @@ export default function CreateModal({ onClose, onCreated }: CreateModalProps) {
               <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto flex-1">
                 {/* Name */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">Name</label>
+                  <label
+                    htmlFor="create-exp-name"
+                    className="block text-sm font-medium text-gray-300 mb-1"
+                  >
+                    Name
+                  </label>
                   <input
+                    id="create-exp-name"
                     type="text"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
@@ -224,10 +252,14 @@ export default function CreateModal({ onClose, onCreated }: CreateModalProps) {
 
                 {/* Description */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
+                  <label
+                    htmlFor="create-exp-description"
+                    className="block text-sm font-medium text-gray-300 mb-1"
+                  >
                     Description
                   </label>
                   <input
+                    id="create-exp-description"
                     type="text"
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
@@ -354,6 +386,7 @@ export default function CreateModal({ onClose, onCreated }: CreateModalProps) {
                               <button
                                 type="button"
                                 onClick={() => removeFile(i)}
+                                aria-label={`Remove ${(f as FileWithPath).webkitRelativePath || f.name}`}
                                 className="p-0.5 hover:bg-red-500/20 rounded transition-colors shrink-0"
                               >
                                 <Trash2 className="w-3 h-3 text-red-400" />
@@ -390,10 +423,14 @@ export default function CreateModal({ onClose, onCreated }: CreateModalProps) {
 
                 {/* Instructions */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
+                  <label
+                    htmlFor="create-exp-instructions"
+                    className="block text-sm font-medium text-gray-300 mb-1"
+                  >
                     Instructions <span className="text-gray-500 font-normal">(optional)</span>
                   </label>
                   <textarea
+                    id="create-exp-instructions"
                     value={instructions}
                     onChange={(e) => setInstructions(e.target.value)}
                     placeholder="Tell the AI what to focus on, e.g. 'Predict survival rate. Focus on feature interactions between class and age.'"
@@ -403,7 +440,11 @@ export default function CreateModal({ onClose, onCreated }: CreateModalProps) {
                 </div>
 
                 {/* Error */}
-                {error && <p className="text-sm text-red-400">{error}</p>}
+                {error && (
+                  <p className="text-sm text-red-400" role="alert">
+                    {error}
+                  </p>
+                )}
 
                 {/* Submit */}
                 <button

@@ -45,6 +45,9 @@ export default function ExperimentCard({
                 e.stopPropagation();
                 onToggleSelect();
               }}
+              role="checkbox"
+              aria-checked={selected}
+              aria-label={`Select ${experiment.name}`}
               className={`mt-0.5 shrink-0 w-4.5 h-4.5 rounded border transition-all flex items-center justify-center ${
                 selected
                   ? 'bg-primary-600 border-primary-600 text-white'
@@ -67,6 +70,7 @@ export default function ExperimentCard({
               e.stopPropagation();
               onDelete();
             }}
+            aria-label={`Delete ${experiment.name}`}
             className="ml-2 p-1.5 rounded-lg text-gray-600 opacity-0 group-hover:opacity-100 hover:text-red-400 hover:bg-red-900/30 transition-all"
             title="Delete experiment"
           >

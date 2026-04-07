@@ -45,7 +45,12 @@ export default function TrainConfigModal({ onConfirm, onClose }: TrainConfigModa
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="train-config-modal-title"
+    >
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
       <div className="relative bg-surface-elevated border border-surface-border rounded-xl shadow-2xl max-w-lg w-full animate-fade-in">
         {/* Header */}
@@ -54,10 +59,13 @@ export default function TrainConfigModal({ onConfirm, onClose }: TrainConfigModa
             <div className="p-2 rounded-full bg-primary-900/40">
               <Zap className="w-4 h-4 text-primary-400" />
             </div>
-            <h2 className="text-base font-semibold text-white">Configure Training</h2>
+            <h2 id="train-config-modal-title" className="text-base font-semibold text-white">
+              Configure Training
+            </h2>
           </div>
           <button
             onClick={onClose}
+            aria-label="Close modal"
             className="p-1.5 hover:bg-surface-hover rounded-lg transition-colors"
           >
             <X className="w-4 h-4 text-gray-400" />
@@ -68,16 +76,21 @@ export default function TrainConfigModal({ onConfirm, onClose }: TrainConfigModa
         <div className="px-5 py-4 space-y-4">
           {/* Compute selector */}
           <div>
-            <label className="block text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">
+            <label
+              id="train-compute-label"
+              className="block text-xs font-medium text-gray-400 uppercase tracking-wide mb-2"
+            >
               Compute
             </label>
-            <div className="space-y-2">
+            <div className="space-y-2" role="radiogroup" aria-labelledby="train-compute-label">
               {COMPUTE_OPTIONS.map((opt) => {
                 const isSelected = selectedGpu === opt.id;
                 const isGpu = opt.id !== undefined;
                 return (
                   <button
                     key={opt.label}
+                    role="radio"
+                    aria-checked={isSelected}
                     onClick={() => setSelectedGpu(opt.id)}
                     className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg border text-left transition-all ${
                       isSelected
@@ -124,10 +137,14 @@ export default function TrainConfigModal({ onConfirm, onClose }: TrainConfigModa
 
           {/* Instructions */}
           <div>
-            <label className="block text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">
+            <label
+              htmlFor="train-instructions"
+              className="block text-xs font-medium text-gray-400 uppercase tracking-wide mb-2"
+            >
               Additional Instructions <span className="text-gray-600">(optional)</span>
             </label>
             <textarea
+              id="train-instructions"
               value={instructions}
               onChange={(e) => setInstructions(e.target.value)}
               placeholder="e.g., Use PyTorch with a ResNet architecture..."

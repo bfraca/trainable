@@ -632,6 +632,7 @@ export default function ExperimentPage() {
       <header className="flex items-center gap-3 px-4 py-2.5 border-b border-surface-border shrink-0 bg-surface">
         <button
           onClick={() => (window.location.href = '/')}
+          aria-label="Back to dashboard"
           className="p-1.5 hover:bg-surface-hover rounded-lg"
         >
           <ArrowLeft className="w-4 h-4 text-gray-400" />
@@ -658,6 +659,7 @@ export default function ExperimentPage() {
               ? 'hover:bg-emerald-600/20 text-emerald-400'
               : 'hover:bg-surface-hover text-gray-400'
           }`}
+          aria-label="Metrics"
           title="Metrics"
         >
           <BarChart3 className="w-4 h-4" />
@@ -668,15 +670,26 @@ export default function ExperimentPage() {
         <button
           onClick={() => setCanvasOpen((prev) => !prev)}
           className={`p-1.5 rounded-lg transition-colors ${canvasOpen ? 'bg-primary-600/20 text-primary-400' : 'hover:bg-surface-hover text-gray-400'}`}
+          aria-label={canvasOpen ? 'Close workspace panel' : 'Open workspace panel'}
           title="Toggle workspace"
         >
           <PanelRightOpen className="w-4 h-4" />
         </button>
         <div className="flex items-center gap-1.5">
           {reconnectingIn !== null && (
-            <span className="text-xs text-yellow-400 animate-pulse">Reconnecting...</span>
+            <span
+              className="text-xs text-yellow-400 animate-pulse"
+              role="status"
+              aria-live="polite"
+            >
+              Reconnecting...
+            </span>
           )}
           <div
+            role="status"
+            aria-label={
+              sseConnected ? 'Connected' : reconnectingIn !== null ? 'Reconnecting' : 'Disconnected'
+            }
             className={`w-2 h-2 rounded-full ${
               sseConnected
                 ? 'bg-green-500'
@@ -730,6 +743,7 @@ export default function ExperimentPage() {
                   <div className="flex items-center gap-1 bg-surface-elevated border border-surface-border rounded-full px-2 py-1.5 focus-within:border-primary-500 transition-colors">
                     <button
                       type="button"
+                      aria-label="Attach file"
                       className="p-2 rounded-full hover:bg-neutral-700 transition-colors text-gray-400 hover:text-gray-300 shrink-0"
                       title="Attach file"
                     >
@@ -745,11 +759,13 @@ export default function ExperimentPage() {
                         (isRunning && !input.trim() ? handleStop() : handleSend())
                       }
                       placeholder="Ask anything"
+                      aria-label="Chat message"
                       className="flex-1 bg-transparent text-white text-sm placeholder-gray-500 focus:outline-none py-1.5"
                     />
                     {isRunning && !input.trim() ? (
                       <button
                         onClick={handleStop}
+                        aria-label="Stop agent"
                         className="p-2 bg-red-600 hover:bg-red-700 rounded-full transition-colors shrink-0"
                         title="Stop agent"
                       >
@@ -759,6 +775,7 @@ export default function ExperimentPage() {
                       <button
                         onClick={handleSend}
                         disabled={!input.trim()}
+                        aria-label="Send message"
                         className="p-2 bg-primary-600 hover:bg-primary-700 disabled:opacity-30 rounded-full transition-colors shrink-0"
                       >
                         <Send className="w-4 h-4 text-white" />

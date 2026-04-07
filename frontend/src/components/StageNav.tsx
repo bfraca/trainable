@@ -40,7 +40,7 @@ function canStartStage(stage: Stage, state: string): boolean {
 
 export default function StageNav({ state, onStartStage, onStop, isRunning }: StageNavProps) {
   return (
-    <div className="flex items-center gap-1">
+    <nav aria-label="Pipeline stages" className="flex items-center gap-1">
       {STAGES.map((stage, i) => {
         const status = getStageStatus(stage.key, state);
         const canStart = !isRunning && status === 'pending' && canStartStage(stage.key, state);
@@ -48,7 +48,7 @@ export default function StageNav({ state, onStartStage, onStop, isRunning }: Sta
 
         return (
           <div key={stage.key} className="flex items-center">
-            {i > 0 && <div className="w-6 h-px bg-surface-border mx-1" />}
+            {i > 0 && <div className="w-6 h-px bg-surface-border mx-1" aria-hidden="true" />}
             <button
               onClick={() =>
                 canStop ? onStop?.() : canStart ? onStartStage(stage.key) : undefined
@@ -65,6 +65,13 @@ export default function StageNav({ state, onStartStage, onStop, isRunning }: Sta
                         ? 'bg-surface-elevated hover:bg-surface-hover text-gray-300 border border-surface-border hover:border-gray-500'
                         : 'bg-surface-elevated text-gray-600 border border-surface-border cursor-not-allowed'
               }`}
+              aria-label={
+                canStop
+                  ? `Stop ${stage.label} stage`
+                  : canStart
+                    ? `Start ${stage.label} stage`
+                    : `${stage.label} stage — ${status}`
+              }
               title={canStop ? 'Click to stop' : undefined}
             >
               {status === 'running' ? (
@@ -84,6 +91,6 @@ export default function StageNav({ state, onStartStage, onStop, isRunning }: Sta
           </div>
         );
       })}
-    </div>
+    </nav>
   );
 }

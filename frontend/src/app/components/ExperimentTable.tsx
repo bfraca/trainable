@@ -69,6 +69,9 @@ export default function ExperimentTable({
                     e.stopPropagation();
                     onToggleAll();
                   }}
+                  role="checkbox"
+                  aria-checked={allOnPageSelected ? true : someOnPageSelected ? 'mixed' : false}
+                  aria-label="Select all experiments on this page"
                   className={`w-4 h-4 rounded border transition-all flex items-center justify-center ${
                     allOnPageSelected
                       ? 'bg-primary-600 border-primary-600 text-white'
@@ -128,6 +131,9 @@ export default function ExperimentTable({
                         e.stopPropagation();
                         onToggleSelect(exp.id);
                       }}
+                      role="checkbox"
+                      aria-checked={isSelected}
+                      aria-label={`Select ${exp.name}`}
                       className={`w-4 h-4 rounded border transition-all flex items-center justify-center ${
                         isSelected
                           ? 'bg-primary-600 border-primary-600 text-white'
@@ -182,6 +188,7 @@ export default function ExperimentTable({
                           e.stopPropagation();
                           onDelete(exp);
                         }}
+                        aria-label={`Delete ${exp.name}`}
                         className="p-1.5 rounded-lg text-gray-600 hover:text-red-400 hover:bg-red-900/30 opacity-0 group-hover:opacity-100 transition-all"
                         title="Delete experiment"
                       >
