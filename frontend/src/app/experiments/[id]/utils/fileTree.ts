@@ -189,5 +189,5 @@ export function ensureStageFolders(tree: FileTreeNode): FileTreeNode {
 }
 
 export function fileBreadcrumb(path: string): string[] {
-  return path.split('/').filter(Boolean);
+  return stripSessionPrefix(path, '').split('/').filter(Boolean);
 }
