@@ -19,8 +19,8 @@ import {
 import StageNav from '@/components/StageNav';
 import TrainConfigModal from '@/components/TrainConfigModal';
 
+import { connectSSE as connectSSEUtil } from '@/lib/sse';
 import { ChatItem, NEXT_STAGE } from './types';
-import { getSSEBase } from './utils/helpers';
 import {
   buildTreeFromFlatList,
   insertNodeIntoTree,
@@ -90,231 +90,230 @@ export default function ExperimentPage() {
   const connectSSE = useCallback(
     (sid: string) => {
       if (sseRef.current) sseRef.current.close();
-      const url = `${getSSEBase()}/api/sessions/${sid}/stream`;
-      const source = new EventSource(url);
 
-      source.onopen = () => setSseConnected(true);
-      source.onmessage = (e) => {
-        try {
-          const event = JSON.parse(e.data) as SSEEvent;
-          const data = event.data as any;
+      const handleEvent = (event: SSEEvent) => {
+        const data = event.data as any;
 
-          switch (event.type) {
-            case 'state_change':
-              setSessionState(data.state);
-              if (data.state.includes('running')) setIsRunning(true);
-              if (
-                data.state.includes('done') ||
-                data.state === 'failed' ||
-                data.state === 'cancelled'
-              )
-                setIsRunning(false);
-              if (data.state.endsWith('_done')) {
-                const stageName = data.state.replace('_done', '').toUpperCase();
-                const next = NEXT_STAGE[data.state];
-                addItem({
-                  type: 'stage_complete',
-                  content: stageName,
-                  meta: next ? { nextStage: next.stage, nextLabel: next.label } : null,
-                });
-              }
-              break;
-            case 'agent_message':
-              addItem({ type: 'assistant', content: data.text });
-              break;
-            case 'agent_token':
-              setChatItems((prev) => {
-                const last = prev[prev.length - 1];
-                if (last && last.type === 'assistant' && Date.now() - last.timestamp < 5000) {
-                  return [...prev.slice(0, -1), { ...last, content: last.content + data.text }];
-                }
-                return [
-                  ...prev,
-                  {
-                    id: `${Date.now()}`,
-                    type: 'assistant',
-                    content: data.text,
-                    timestamp: Date.now(),
-                  },
-                ];
-              });
-              break;
-            case 'tool_start':
-              addItem({ type: 'tool_start', content: data.tool, meta: data.input });
-              break;
-            case 'tool_end':
-              setChatItems((prev) => {
-                const idx = prev.findLastIndex(
-                  (i) => i.type === 'tool_start' && i.content === data.tool,
-                );
-                if (idx >= 0) {
-                  const updated = [...prev];
-                  const duration = Math.max(
-                    1,
-                    Math.round((Date.now() - updated[idx].timestamp) / 1000),
-                  );
-                  updated[idx] = {
-                    ...updated[idx],
-                    type: 'tool_end',
-                    meta: {
-                      ...updated[idx].meta,
-                      output: data.output,
-                      outputs: updated[idx].meta?.outputs || [],
-                      duration,
-                    },
-                  };
-                  return updated;
-                }
-                return [
-                  ...prev,
-                  {
-                    id: `${Date.now()}-${Math.random()}`,
-                    type: 'tool_end',
-                    content: data.tool,
-                    meta: { output: data.output },
-                    timestamp: Date.now(),
-                  },
-                ];
-              });
-              break;
-            case 'code_output':
-              setChatItems((prev) => {
-                const idx = prev.findLastIndex((i) => i.type === 'tool_start');
-                if (idx >= 0) {
-                  const updated = [...prev];
-                  const outputs = updated[idx].meta?.outputs || [];
-                  updated[idx] = {
-                    ...updated[idx],
-                    meta: {
-                      ...updated[idx].meta,
-                      outputs: [...outputs, { text: data.text, stream: data.stream }],
-                    },
-                  };
-                  return updated;
-                }
-                addItem({
-                  type: 'code_output',
-                  content: data.text,
-                  meta: { stream: data.stream },
-                });
-                return prev;
-              });
-              break;
-            case 'agent_error':
-              addItem({ type: 'error', content: data.error });
+        switch (event.type) {
+          case 'state_change':
+            setSessionState(data.state);
+            if (data.state.includes('running')) setIsRunning(true);
+            if (
+              data.state.includes('done') ||
+              data.state === 'failed' ||
+              data.state === 'cancelled'
+            )
               setIsRunning(false);
-              break;
-            case 'report_ready':
-              setCanvasContent(data.content);
-              setCanvasTitle(`${(data.stage || 'EDA').toUpperCase()} Report`);
-              setCanvasOpen(true);
-              break;
-            case 'files_ready': {
-              const stage = (data.stage as string) || '';
-              const newFiles = (data.files || []) as { path: string; type: string }[];
-              setGeneratedFiles((prev) => {
-                const existingPaths = new Set(prev.map((f: any) => f.path));
-                const merged = [...prev];
-                for (const f of newFiles) {
-                  if (!existingPaths.has(f.path)) merged.push(f);
-                }
-                return merged;
+            if (data.state.endsWith('_done')) {
+              const stageName = data.state.replace('_done', '').toUpperCase();
+              const next = NEXT_STAGE[data.state];
+              addItem({
+                type: 'stage_complete',
+                content: stageName,
+                meta: next ? { nextStage: next.stage, nextLabel: next.label } : null,
               });
-              setFileTree((prev) => {
-                let merged = JSON.parse(JSON.stringify(prev)) as FileTreeNode;
-                for (const f of newFiles) {
-                  merged = insertNodeIntoTree(
-                    merged,
-                    { name: f.path.split('/').pop() || '', path: f.path, type: 'file' },
-                    `/sessions/${sid}`,
-                    stage,
-                  );
-                }
-                return ensureStageFolders(merged);
-              });
-              break;
             }
-            case 'file_created': {
-              const stage = (data.stage as string) || '';
-              setFileTree((prev) =>
-                insertNodeIntoTree(
-                  prev,
-                  {
-                    name: data.name as string,
-                    path: data.path as string,
-                    type: 'file',
+            break;
+          case 'agent_message':
+            addItem({ type: 'assistant', content: data.text });
+            break;
+          case 'agent_token':
+            setChatItems((prev) => {
+              const last = prev[prev.length - 1];
+              if (last && last.type === 'assistant' && Date.now() - last.timestamp < 5000) {
+                return [...prev.slice(0, -1), { ...last, content: last.content + data.text }];
+              }
+              return [
+                ...prev,
+                {
+                  id: `${Date.now()}`,
+                  type: 'assistant',
+                  content: data.text,
+                  timestamp: Date.now(),
+                },
+              ];
+            });
+            break;
+          case 'tool_start':
+            addItem({ type: 'tool_start', content: data.tool, meta: data.input });
+            break;
+          case 'tool_end':
+            setChatItems((prev) => {
+              const idx = prev.findLastIndex(
+                (i) => i.type === 'tool_start' && i.content === data.tool,
+              );
+              if (idx >= 0) {
+                const updated = [...prev];
+                const duration = Math.max(
+                  1,
+                  Math.round((Date.now() - updated[idx].timestamp) / 1000),
+                );
+                updated[idx] = {
+                  ...updated[idx],
+                  type: 'tool_end',
+                  meta: {
+                    ...updated[idx].meta,
+                    output: data.output,
+                    outputs: updated[idx].meta?.outputs || [],
+                    duration,
                   },
+                };
+                return updated;
+              }
+              return [
+                ...prev,
+                {
+                  id: `${Date.now()}-${Math.random()}`,
+                  type: 'tool_end',
+                  content: data.tool,
+                  meta: { output: data.output },
+                  timestamp: Date.now(),
+                },
+              ];
+            });
+            break;
+          case 'code_output':
+            setChatItems((prev) => {
+              const idx = prev.findLastIndex((i) => i.type === 'tool_start');
+              if (idx >= 0) {
+                const updated = [...prev];
+                const outputs = updated[idx].meta?.outputs || [];
+                updated[idx] = {
+                  ...updated[idx],
+                  meta: {
+                    ...updated[idx].meta,
+                    outputs: [...outputs, { text: data.text, stream: data.stream }],
+                  },
+                };
+                return updated;
+              }
+              addItem({
+                type: 'code_output',
+                content: data.text,
+                meta: { stream: data.stream },
+              });
+              return prev;
+            });
+            break;
+          case 'agent_error':
+            addItem({ type: 'error', content: data.error });
+            setIsRunning(false);
+            break;
+          case 'report_ready':
+            setCanvasContent(data.content);
+            setCanvasTitle(`${(data.stage || 'EDA').toUpperCase()} Report`);
+            setCanvasOpen(true);
+            break;
+          case 'files_ready': {
+            const stage = (data.stage as string) || '';
+            const newFiles = (data.files || []) as { path: string; type: string }[];
+            setGeneratedFiles((prev) => {
+              const existingPaths = new Set(prev.map((f: any) => f.path));
+              const merged = [...prev];
+              for (const f of newFiles) {
+                if (!existingPaths.has(f.path)) merged.push(f);
+              }
+              return merged;
+            });
+            setFileTree((prev) => {
+              let merged = JSON.parse(JSON.stringify(prev)) as FileTreeNode;
+              for (const f of newFiles) {
+                merged = insertNodeIntoTree(
+                  merged,
+                  { name: f.path.split('/').pop() || '', path: f.path, type: 'file' },
                   `/sessions/${sid}`,
                   stage,
-                ),
-              );
-              break;
-            }
-            case 'agent_aborted':
-              addItem({ type: 'status', content: 'Agent stopped' });
-              setIsRunning(false);
-              break;
-            case 'metrics_batch': {
-              const items = (data.items || []) as any[];
-              const newPoints: MetricPoint[] = [];
-              const now = new Date().toISOString();
-              for (const m of items) {
-                const key = `${m.step}:${m.name}:${m.run_tag || ''}`;
-                if (!metricKeysRef.current.has(key)) {
-                  metricKeysRef.current.add(key);
-                  newPoints.push({
-                    step: m.step,
-                    name: m.name,
-                    value: m.value,
-                    stage: m.stage,
-                    run_tag: m.run_tag || null,
-                    created_at: now,
-                  });
-                }
+                );
               }
-              if (newPoints.length > 0) {
-                setMetricPoints((prev) => {
-                  if (prev.length === 0) setCanvasOpen(true);
-                  return [...prev, ...newPoints];
-                });
-              }
-              break;
-            }
-            case 'metric': {
-              const key = `${data.step}:${data.name}:${data.run_tag || ''}`;
+              return ensureStageFolders(merged);
+            });
+            break;
+          }
+          case 'file_created': {
+            const stage = (data.stage as string) || '';
+            setFileTree((prev) =>
+              insertNodeIntoTree(
+                prev,
+                {
+                  name: data.name as string,
+                  path: data.path as string,
+                  type: 'file',
+                },
+                `/sessions/${sid}`,
+                stage,
+              ),
+            );
+            break;
+          }
+          case 'agent_aborted':
+            addItem({ type: 'status', content: 'Agent stopped' });
+            setIsRunning(false);
+            break;
+          case 'metrics_batch': {
+            const items = (data.items || []) as any[];
+            const newPoints: MetricPoint[] = [];
+            const now = new Date().toISOString();
+            for (const m of items) {
+              const key = `${m.step}:${m.name}:${m.run_tag || ''}`;
               if (!metricKeysRef.current.has(key)) {
                 metricKeysRef.current.add(key);
-                setMetricPoints((prev) => {
-                  if (prev.length === 0) setCanvasOpen(true);
-                  return [
-                    ...prev,
-                    {
-                      step: data.step as number,
-                      name: data.name as string,
-                      value: data.value as number,
-                      stage: data.stage as string,
-                      run_tag: (data.run_tag as string) || null,
-                      created_at: new Date().toISOString(),
-                    },
-                  ];
+                newPoints.push({
+                  step: m.step,
+                  name: m.name,
+                  value: m.value,
+                  stage: m.stage,
+                  run_tag: m.run_tag || null,
+                  created_at: now,
                 });
               }
-              break;
             }
-            case 'chart_config': {
-              const cfg = data as any;
-              if (cfg.charts && Array.isArray(cfg.charts)) {
-                setChartConfig({ charts: cfg.charts });
-              }
-              break;
+            if (newPoints.length > 0) {
+              setMetricPoints((prev) => {
+                if (prev.length === 0) setCanvasOpen(true);
+                return [...prev, ...newPoints];
+              });
             }
+            break;
           }
-        } catch {
-          /* ignore */
+          case 'metric': {
+            const key = `${data.step}:${data.name}:${data.run_tag || ''}`;
+            if (!metricKeysRef.current.has(key)) {
+              metricKeysRef.current.add(key);
+              setMetricPoints((prev) => {
+                if (prev.length === 0) setCanvasOpen(true);
+                return [
+                  ...prev,
+                  {
+                    step: data.step as number,
+                    name: data.name as string,
+                    value: data.value as number,
+                    stage: data.stage as string,
+                    run_tag: (data.run_tag as string) || null,
+                    created_at: new Date().toISOString(),
+                  },
+                ];
+              });
+            }
+            break;
+          }
+          case 'chart_config': {
+            const cfg = data as any;
+            if (cfg.charts && Array.isArray(cfg.charts)) {
+              setChartConfig({ charts: cfg.charts });
+            }
+            break;
+          }
         }
       };
-      source.onerror = () => setSseConnected(false);
-      sseRef.current = source;
+
+      // Use the shared SSE utility — single source of truth for connection logic
+      const disconnect = connectSSEUtil(sid, {
+        onEvent: handleEvent,
+        onOpen: () => setSseConnected(true),
+        onError: () => setSseConnected(false),
+      });
+      // Store disconnect fn so we can close from handleStop / cleanup
+      sseRef.current = { close: disconnect } as EventSource;
     },
     [addItem],
   );
@@ -413,9 +412,7 @@ export default function ExperimentPage() {
                   path: string;
                   _stage?: string;
                 }>;
-                const existingPaths = new Set(
-                  restoredFiles.map((f: { path: string }) => f.path),
-                );
+                const existingPaths = new Set(restoredFiles.map((f: { path: string }) => f.path));
                 for (const f of newFiles) {
                   if (!existingPaths.has(f.path)) {
                     restoredFiles.push({ ...f, _stage: stageHint });
@@ -673,9 +670,7 @@ export default function ExperimentPage() {
         <Panel defaultSize={canvasOpen ? 25 : 100} minSize={15}>
           <div className="h-full flex flex-col min-w-0">
             <div className="flex-1 overflow-y-auto px-4 py-4">
-              <div
-                className={`mx-auto w-full space-y-4 ${canvasOpen ? 'max-w-3xl' : 'max-w-5xl'}`}
-              >
+              <div className={`mx-auto w-full space-y-4 ${canvasOpen ? 'max-w-3xl' : 'max-w-5xl'}`}>
                 {chatItems.map((item) => renderChatItem(item))}
 
                 {isRunning &&
