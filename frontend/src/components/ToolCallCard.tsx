@@ -1,18 +1,17 @@
 'use client';
 
 import { Code2, CheckCircle2, Loader2 } from 'lucide-react';
-import { SSEEvent } from '@/lib/types';
+import { ToolStartEvent, ToolEndEvent } from '@/lib/types';
 
 interface ToolCallCardProps {
-  event: SSEEvent;
+  event: ToolStartEvent | ToolEndEvent;
 }
 
 export default function ToolCallCard({ event }: ToolCallCardProps) {
-  const data = event.data as any;
   const isStart = event.type === 'tool_start';
-  const toolName = data.tool || 'unknown';
-  const input = data.input;
-  const output = data.output;
+  const toolName = event.data.tool || 'unknown';
+  const input = event.type === 'tool_start' ? event.data.input : undefined;
+  const output = event.type === 'tool_end' ? event.data.output : undefined;
 
   return (
     <div className="animate-fade-in border border-surface-border rounded-lg overflow-hidden">

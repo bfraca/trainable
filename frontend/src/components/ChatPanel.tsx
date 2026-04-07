@@ -13,7 +13,7 @@ import {
   ChevronRight,
   Plus,
 } from 'lucide-react';
-import { Message, SSEEvent } from '@/lib/types';
+import { Message, SSEEvent, ToolStartEvent, ToolEndEvent } from '@/lib/types';
 import MessageBubble from './MessageBubble';
 
 interface ChatPanelProps {
@@ -73,16 +73,15 @@ function useFunVerb(isAnimating: boolean) {
   return FUN_VERBS[index];
 }
 
-function ToolCard({ event }: { event: SSEEvent }) {
-  const data = event.data as any;
+function ToolCard({ event }: { event: ToolStartEvent | ToolEndEvent }) {
   const isStart = event.type === 'tool_start';
   const [collapsed, setCollapsed] = useState(true);
   const funVerb = useFunVerb(isStart);
   const [startedAt] = useState(() => Date.now());
   const [doneLabel] = useState(() => PAST_VERBS[Math.floor(Math.random() * PAST_VERBS.length)]);
   const [elapsed, setElapsed] = useState(0);
-  const code = data.input?.code;
-  const output = data.output;
+  const code = event.type === 'tool_start' ? event.data.input?.code : undefined;
+  const output = event.type === 'tool_end' ? event.data.output : undefined;
 
   useEffect(() => {
     if (!isStart) return;
@@ -189,43 +188,35 @@ export default function ChatPanel({
             case 'tool_start':
             case 'tool_end':
               return <ToolCard key={`ev-${i}`} event={event} />;
-            case 'code_output': {
-              const d = event.data as any;
-              return <CodeOutput key={`ev-${i}`} text={d.text} stream={d.stream} />;
-            }
-            case 'agent_message': {
-              const d = event.data as any;
+            case 'code_output':
+              return <CodeOutput key={`ev-${i}`} text={event.data.text} stream={event.data.stream} />;
+            case 'agent_message':
               return (
                 <div key={`ev-${i}`} className="flex gap-2.5 animate-fade-in">
                   <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 bg-emerald-500/20">
                     <Bot className="w-3.5 h-3.5 text-emerald-400" />
                   </div>
                   <div className="max-w-[85%] px-3.5 py-2.5 rounded-2xl rounded-bl-md text-sm leading-relaxed bg-surface-elevated text-gray-200 border border-surface-border">
-                    {d.text}
+                    {event.data.text}
                   </div>
                 </div>
               );
-            }
-            case 'agent_error': {
-              const d = event.data as any;
+            case 'agent_error':
               return (
                 <div
                   key={`ev-${i}`}
                   className="flex items-center gap-2 px-3 py-2 bg-red-900/30 border border-red-800/50 rounded-lg text-sm text-red-400 mx-1"
                 >
                   <AlertCircle className="w-4 h-4 shrink-0" />
-                  <span className="truncate">{d.error}</span>
+                  <span className="truncate">{event.data.error}</span>
                 </div>
               );
-            }
-            case 'state_change': {
-              const d = event.data as any;
+            case 'state_change':
               return (
                 <div key={`ev-${i}`} className="text-center text-xs text-gray-600 py-1">
-                  Stage: {d.state}
+                  Stage: {event.data.state}
                 </div>
               );
-            }
             default:
               return null;
           }

@@ -14,6 +14,11 @@ import {
 import { api } from '@/lib/api';
 import S3FileBrowserModal from './S3FileBrowserModal';
 
+/** Extends the standard File interface with the non-standard webkitRelativePath property. */
+interface FileWithPath extends File {
+  readonly webkitRelativePath: string;
+}
+
 interface CreateModalProps {
   onClose: () => void;
   onCreated: (exp: { id: string; session_id: string }) => void;
@@ -125,7 +130,7 @@ export default function CreateModal({ onClose, onCreated }: CreateModalProps) {
         formData.append('description', description.trim());
         formData.append('instructions', instructions.trim());
         for (const f of files) {
-          const path = (f as any).webkitRelativePath || f.name;
+          const path = (f as FileWithPath).webkitRelativePath || f.name;
           formData.append('files', f, path);
         }
         result = await api.createExperiment(formData);
@@ -341,7 +346,7 @@ export default function CreateModal({ onClose, onCreated }: CreateModalProps) {
                             >
                               <FileText className="w-3.5 h-3.5 text-gray-500 shrink-0" />
                               <span className="text-gray-300 truncate flex-1">
-                                {(f as any).webkitRelativePath || f.name}
+                                {(f as FileWithPath).webkitRelativePath || f.name}
                               </span>
                               <span className="text-gray-600 text-xs shrink-0">
                                 {formatSize(f.size)}

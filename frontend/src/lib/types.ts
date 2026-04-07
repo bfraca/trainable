@@ -56,10 +56,119 @@ export interface ChartConfig {
 
 export type Stage = 'eda' | 'prep' | 'train';
 
-export interface SSEEvent {
-  type: string;
+// ---------------------------------------------------------------------------
+// SSE event discriminated union — every backend event type gets its own shape.
+// The `type` field acts as the discriminant so TypeScript narrows `data`
+// automatically inside a switch/case on `event.type`.
+// ---------------------------------------------------------------------------
+
+export interface StateChangeEvent {
+  type: 'state_change';
+  data: { state: string };
+}
+export interface AgentMessageEvent {
+  type: 'agent_message';
+  data: { text: string };
+}
+export interface AgentTokenEvent {
+  type: 'agent_token';
+  data: { text: string };
+}
+export interface ToolStartEvent {
+  type: 'tool_start';
+  data: { tool: string; input?: { code?: string } };
+}
+export interface ToolEndEvent {
+  type: 'tool_end';
+  data: { tool: string; output?: string };
+}
+export interface CodeOutputEvent {
+  type: 'code_output';
+  data: { text: string; stream: string };
+}
+export interface AgentErrorEvent {
+  type: 'agent_error';
+  data: { error: string };
+}
+export interface ReportReadyEvent {
+  type: 'report_ready';
+  data: { content: string; stage?: string };
+}
+export interface FilesReadyEvent {
+  type: 'files_ready';
+  data: { files: Array<{ path: string; type: string }>; stage?: string; workspace?: string };
+}
+export interface FileCreatedEvent {
+  type: 'file_created';
+  data: { path: string; name: string; type: string; stage?: string };
+}
+export interface AgentAbortedEvent {
+  type: 'agent_aborted';
+  data: { reason?: string; stage?: string };
+}
+export interface MetricsBatchEvent {
+  type: 'metrics_batch';
+  data: {
+    items: Array<{
+      step: number;
+      name: string;
+      value: number;
+      stage?: string;
+      run_tag?: string | null;
+    }>;
+  };
+}
+export interface MetricEvent {
+  type: 'metric';
+  data: {
+    step: number;
+    name: string;
+    value: number;
+    stage?: string;
+    run_tag?: string | null;
+  };
+}
+export interface ChartConfigEvent {
+  type: 'chart_config';
+  data: { charts: Array<{ title: string; metrics: string[]; type: string }> };
+}
+export interface UserMessageEvent {
+  type: 'user_message';
+  data: { content: string };
+}
+export interface ValidationResultEvent {
+  type: 'validation_result';
   data: Record<string, unknown>;
 }
+export interface S3SyncCompleteEvent {
+  type: 's3_sync_complete';
+  data: { stage: string; files_synced: number; s3_prefix?: string };
+}
+export interface MetadataReadyEvent {
+  type: 'metadata_ready';
+  data: { session_id: string };
+}
+
+/** Union of every SSE event the backend can emit. */
+export type SSEEvent =
+  | StateChangeEvent
+  | AgentMessageEvent
+  | AgentTokenEvent
+  | ToolStartEvent
+  | ToolEndEvent
+  | CodeOutputEvent
+  | AgentErrorEvent
+  | ReportReadyEvent
+  | FilesReadyEvent
+  | FileCreatedEvent
+  | AgentAbortedEvent
+  | MetricsBatchEvent
+  | MetricEvent
+  | ChartConfigEvent
+  | UserMessageEvent
+  | ValidationResultEvent
+  | S3SyncCompleteEvent
+  | MetadataReadyEvent;
 
 export interface ExperimentDetail extends Experiment {
   sessions: Session[];
@@ -95,48 +204,6 @@ export interface AbortResponse {
   status: string;
 }
 
-// SSE event data shapes
-export interface ToolEventData {
-  tool: string;
-  input?: { code?: string };
-  output?: string;
-}
-export interface AgentMessageData {
-  text: string;
-}
-export interface AgentErrorData {
-  error: string;
-}
-export interface StateChangeData {
-  state: string;
-}
-export interface CodeOutputData {
-  text: string;
-  stream: string;
-}
-export interface FileCreatedData {
-  path: string;
-  name: string;
-  type: string;
-  stage: string;
-}
-export interface FilesReadyData {
-  files: Array<{ path: string; type: string }>;
-  stage: string;
-  workspace?: string;
-}
-export interface ReportReadyData {
-  content: string;
-  stage: string;
-}
-export interface MetricEventData {
-  step: number;
-  metrics: Record<string, number>;
-  run?: string;
-}
-export interface ChartConfigEventData {
-  charts: Array<{ title: string; metrics: string[]; type: string }>;
-}
 export interface GeneratedFile {
   path: string;
   type: string;

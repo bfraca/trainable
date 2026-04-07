@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api';
-import { SSEEvent, FileTreeNode, Stage, MetricPoint, ChartConfig } from '@/lib/types';
+import { SSEEvent, FileTreeNode, Stage, MetricPoint, ChartConfig, GeneratedFile } from '@/lib/types';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import {
   ArrowLeft,
@@ -54,7 +54,7 @@ export default function ExperimentPage() {
   const [canvasOpen, setCanvasOpen] = useState(false);
   const [canvasContent, setCanvasContent] = useState('');
   const [canvasTitle, setCanvasTitle] = useState('Report');
-  const [generatedFiles, setGeneratedFiles] = useState<any[]>([]);
+  const [generatedFiles, setGeneratedFiles] = useState<GeneratedFile[]>([]);
   const [fileTree, setFileTree] = useState<FileTreeNode>(() =>
     ensureStageFolders({
       name: 'workspace',
@@ -97,21 +97,20 @@ export default function ExperimentPage() {
       source.onmessage = (e) => {
         try {
           const event = JSON.parse(e.data) as SSEEvent;
-          const data = event.data as any;
 
           switch (event.type) {
             case 'state_change':
-              setSessionState(data.state);
-              if (data.state.includes('running')) setIsRunning(true);
+              setSessionState(event.data.state);
+              if (event.data.state.includes('running')) setIsRunning(true);
               if (
-                data.state.includes('done') ||
-                data.state === 'failed' ||
-                data.state === 'cancelled'
+                event.data.state.includes('done') ||
+                event.data.state === 'failed' ||
+                event.data.state === 'cancelled'
               )
                 setIsRunning(false);
-              if (data.state.endsWith('_done')) {
-                const stageName = data.state.replace('_done', '').toUpperCase();
-                const next = NEXT_STAGE[data.state];
+              if (event.data.state.endsWith('_done')) {
+                const stageName = event.data.state.replace('_done', '').toUpperCase();
+                const next = NEXT_STAGE[event.data.state];
                 addItem({
                   type: 'stage_complete',
                   content: stageName,
@@ -120,32 +119,32 @@ export default function ExperimentPage() {
               }
               break;
             case 'agent_message':
-              addItem({ type: 'assistant', content: data.text });
+              addItem({ type: 'assistant', content: event.data.text });
               break;
             case 'agent_token':
               setChatItems((prev) => {
                 const last = prev[prev.length - 1];
                 if (last && last.type === 'assistant' && Date.now() - last.timestamp < 5000) {
-                  return [...prev.slice(0, -1), { ...last, content: last.content + data.text }];
+                  return [...prev.slice(0, -1), { ...last, content: last.content + event.data.text }];
                 }
                 return [
                   ...prev,
                   {
                     id: `${Date.now()}`,
                     type: 'assistant',
-                    content: data.text,
+                    content: event.data.text,
                     timestamp: Date.now(),
                   },
                 ];
               });
               break;
             case 'tool_start':
-              addItem({ type: 'tool_start', content: data.tool, meta: data.input });
+              addItem({ type: 'tool_start', content: event.data.tool, meta: event.data.input });
               break;
             case 'tool_end':
               setChatItems((prev) => {
                 const idx = prev.findLastIndex(
-                  (i) => i.type === 'tool_start' && i.content === data.tool,
+                  (i) => i.type === 'tool_start' && i.content === event.data.tool,
                 );
                 if (idx >= 0) {
                   const updated = [...prev];
@@ -158,7 +157,7 @@ export default function ExperimentPage() {
                     type: 'tool_end',
                     meta: {
                       ...updated[idx].meta,
-                      output: data.output,
+                      output: event.data.output,
                       outputs: updated[idx].meta?.outputs || [],
                       duration,
                     },
@@ -170,8 +169,8 @@ export default function ExperimentPage() {
                   {
                     id: `${Date.now()}-${Math.random()}`,
                     type: 'tool_end',
-                    content: data.tool,
-                    meta: { output: data.output },
+                    content: event.data.tool,
+                    meta: { output: event.data.output },
                     timestamp: Date.now(),
                   },
                 ];
@@ -187,33 +186,33 @@ export default function ExperimentPage() {
                     ...updated[idx],
                     meta: {
                       ...updated[idx].meta,
-                      outputs: [...outputs, { text: data.text, stream: data.stream }],
+                      outputs: [...outputs, { text: event.data.text, stream: event.data.stream }],
                     },
                   };
                   return updated;
                 }
                 addItem({
                   type: 'code_output',
-                  content: data.text,
-                  meta: { stream: data.stream },
+                  content: event.data.text,
+                  meta: { stream: event.data.stream },
                 });
                 return prev;
               });
               break;
             case 'agent_error':
-              addItem({ type: 'error', content: data.error });
+              addItem({ type: 'error', content: event.data.error });
               setIsRunning(false);
               break;
             case 'report_ready':
-              setCanvasContent(data.content);
-              setCanvasTitle(`${(data.stage || 'EDA').toUpperCase()} Report`);
+              setCanvasContent(event.data.content);
+              setCanvasTitle(`${(event.data.stage || 'EDA').toUpperCase()} Report`);
               setCanvasOpen(true);
               break;
             case 'files_ready': {
-              const stage = (data.stage as string) || '';
-              const newFiles = (data.files || []) as { path: string; type: string }[];
+              const stage = event.data.stage || '';
+              const newFiles = event.data.files || [];
               setGeneratedFiles((prev) => {
-                const existingPaths = new Set(prev.map((f: any) => f.path));
+                const existingPaths = new Set(prev.map((f) => f.path));
                 const merged = [...prev];
                 for (const f of newFiles) {
                   if (!existingPaths.has(f.path)) merged.push(f);
@@ -235,13 +234,13 @@ export default function ExperimentPage() {
               break;
             }
             case 'file_created': {
-              const stage = (data.stage as string) || '';
+              const stage = event.data.stage || '';
               setFileTree((prev) =>
                 insertNodeIntoTree(
                   prev,
                   {
-                    name: data.name as string,
-                    path: data.path as string,
+                    name: event.data.name,
+                    path: event.data.path,
                     type: 'file',
                   },
                   `/sessions/${sid}`,
@@ -255,7 +254,7 @@ export default function ExperimentPage() {
               setIsRunning(false);
               break;
             case 'metrics_batch': {
-              const items = (data.items || []) as any[];
+              const items = event.data.items || [];
               const newPoints: MetricPoint[] = [];
               const now = new Date().toISOString();
               for (const m of items) {
@@ -281,7 +280,7 @@ export default function ExperimentPage() {
               break;
             }
             case 'metric': {
-              const key = `${data.step}:${data.name}:${data.run_tag || ''}`;
+              const key = `${event.data.step}:${event.data.name}:${event.data.run_tag || ''}`;
               if (!metricKeysRef.current.has(key)) {
                 metricKeysRef.current.add(key);
                 setMetricPoints((prev) => {
@@ -289,11 +288,11 @@ export default function ExperimentPage() {
                   return [
                     ...prev,
                     {
-                      step: data.step as number,
-                      name: data.name as string,
-                      value: data.value as number,
-                      stage: data.stage as string,
-                      run_tag: (data.run_tag as string) || null,
+                      step: event.data.step,
+                      name: event.data.name,
+                      value: event.data.value,
+                      stage: event.data.stage,
+                      run_tag: event.data.run_tag || null,
                       created_at: new Date().toISOString(),
                     },
                   ];
@@ -302,9 +301,8 @@ export default function ExperimentPage() {
               break;
             }
             case 'chart_config': {
-              const cfg = data as any;
-              if (cfg.charts && Array.isArray(cfg.charts)) {
-                setChartConfig({ charts: cfg.charts });
+              if (event.data.charts && Array.isArray(event.data.charts)) {
+                setChartConfig({ charts: event.data.charts });
               }
               break;
             }
@@ -341,7 +339,7 @@ export default function ExperimentPage() {
           let restoredCanvasContent = '';
           let restoredCanvasTitle = 'Report';
           let restoredCanvasOpen = false;
-          let restoredFiles: any[] = [];
+          let restoredFiles: Array<{ path: string; type?: string; _stage?: string }> = [];
 
           if (sessionData.messages?.length > 0) {
             for (const msg of sessionData.messages) {
