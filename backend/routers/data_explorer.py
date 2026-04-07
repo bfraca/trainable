@@ -1,5 +1,6 @@
 """Data exploration endpoints using DuckDB for querying processed parquet files."""
 
+import asyncio
 import io
 import logging
 import re
@@ -66,58 +67,57 @@ async def query_prep_data(session_id: str, body: QueryRequest):
     Also creates an all_data view combining all splits with a 'split' column.
     """
 
-    reload_volume()
+    # Validate user SQL before entering the thread (fast, no I/O)
+    sql = body.sql.strip().rstrip(";")
+    _validate_query(sql)
+    max_limit = min(body.limit, 1000)
+    if "LIMIT" not in sql.upper():
+        sql += f" LIMIT {max_limit}"
 
-    data_dir = f"/sessions/{session_id}/prep/data"
-    con = duckdb.connect(":memory:")
+    def _blocking():
+        reload_volume()
+        data_dir = f"/sessions/{session_id}/prep/data"
+        con = duckdb.connect(":memory:")
+        try:
+            for split in ["train", "val", "test"]:
+                path = f"{data_dir}/{split}.parquet"
+                try:
+                    raw = read_volume_file(path)
+                    _load_parquet_to_duckdb(con, raw, split)
+                except Exception:
+                    pass
+
+            tables = [name[0] for name in con.execute("SHOW TABLES").fetchall()]
+            if not tables:
+                raise HTTPException(status_code=404, detail="No processed data found")
+
+            if len(tables) > 1:
+                union_sql = " UNION ALL ".join(
+                    f"SELECT *, '{t}' as split FROM {t}" for t in tables
+                )
+                con.execute(f"CREATE VIEW all_data AS {union_sql}")
+
+            con.execute("SET enable_external_access = false")
+
+            result = con.execute(sql)
+            columns = [desc[0] for desc in result.description]
+            rows = result.fetchall()
+
+            return {
+                "columns": columns,
+                "rows": [list(row) for row in rows],
+                "row_count": len(rows),
+                "tables_available": tables,
+            }
+        finally:
+            con.close()
 
     try:
-        # Load available splits into DuckDB via pyarrow (before disabling external access)
-        for split in ["train", "val", "test"]:
-            path = f"{data_dir}/{split}.parquet"
-            try:
-                raw = read_volume_file(path)
-                _load_parquet_to_duckdb(con, raw, split)
-            except Exception:
-                pass
-
-        tables = [name[0] for name in con.execute("SHOW TABLES").fetchall()]
-        if not tables:
-            raise HTTPException(status_code=404, detail="No processed data found")
-
-        # Create combined view
-        if len(tables) > 1:
-            union_sql = " UNION ALL ".join(
-                f"SELECT *, '{t}' as split FROM {t}" for t in tables
-            )
-            con.execute(f"CREATE VIEW all_data AS {union_sql}")
-
-        # Disable filesystem and network access before running user SQL
-        con.execute("SET enable_external_access = false")
-
-        # Validate and execute user query with limit enforcement
-        sql = body.sql.strip().rstrip(";")
-        _validate_query(sql)
-        max_limit = min(body.limit, 1000)
-        if "LIMIT" not in sql.upper():
-            sql += f" LIMIT {max_limit}"
-
-        result = con.execute(sql)
-        columns = [desc[0] for desc in result.description]
-        rows = result.fetchall()
-
-        return {
-            "columns": columns,
-            "rows": [list(row) for row in rows],
-            "row_count": len(rows),
-            "tables_available": tables,
-        }
+        return await asyncio.to_thread(_blocking)
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Query error: {e}")
-    finally:
-        con.close()
 
 
 @router.get("/sessions/{session_id}/prep/preview")
@@ -128,28 +128,30 @@ async def preview_prep_data(
 ):
     """Quick preview of a processed data split (first N rows)."""
 
-    reload_volume()
+    def _blocking():
+        reload_volume()
+        path = f"/sessions/{session_id}/prep/data/{split}.parquet"
+        try:
+            raw = read_volume_file(path)
+        except Exception:
+            raise HTTPException(status_code=404, detail=f"{split}.parquet not found")
 
-    path = f"/sessions/{session_id}/prep/data/{split}.parquet"
-    try:
-        raw = read_volume_file(path)
-    except Exception:
-        raise HTTPException(status_code=404, detail=f"{split}.parquet not found")
+        con = duckdb.connect(":memory:")
+        try:
+            _load_parquet_to_duckdb(con, raw, split)
+            result = con.execute(f"SELECT * FROM {split} LIMIT ?", [limit])
+            columns = [desc[0] for desc in result.description]
+            rows = result.fetchall()
+            return {
+                "split": split,
+                "columns": columns,
+                "rows": [list(row) for row in rows],
+                "row_count": len(rows),
+            }
+        finally:
+            con.close()
 
-    con = duckdb.connect(":memory:")
-    try:
-        _load_parquet_to_duckdb(con, raw, split)
-        result = con.execute(f"SELECT * FROM {split} LIMIT ?", [limit])
-        columns = [desc[0] for desc in result.description]
-        rows = result.fetchall()
-        return {
-            "split": split,
-            "columns": columns,
-            "rows": [list(row) for row in rows],
-            "row_count": len(rows),
-        }
-    finally:
-        con.close()
+    return await asyncio.to_thread(_blocking)
 
 
 @router.get("/sessions/{session_id}/prep/metadata")

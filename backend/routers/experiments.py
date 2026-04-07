@@ -1,5 +1,6 @@
 """Experiment CRUD routes."""
 
+import asyncio
 import logging
 import os
 import re
@@ -69,14 +70,17 @@ async def create_experiment(
                     chunk = await f.read(1024 * 1024)
             logger.info("Read %s: %d bytes (streamed to disk)", filename, total_bytes)
 
-            # Upload to S3 from disk — boto3 handles multipart automatically
-            with open(tmp_path, "rb") as fobj:
-                s3.upload_fileobj(
-                    fobj,
-                    "datasets",
-                    key,
-                    ExtraArgs={"ContentType": content_type},
-                )
+            # Upload to S3 from disk — offload blocking call to thread pool
+            def _upload_s3():
+                with open(tmp_path, "rb") as fobj:
+                    s3.upload_fileobj(
+                        fobj,
+                        "datasets",
+                        key,
+                        ExtraArgs={"ContentType": content_type},
+                    )
+
+            await asyncio.to_thread(_upload_s3)
 
             # Upload to Modal Volume (for sandbox execution)
             try:
@@ -145,13 +149,19 @@ async def create_experiment_from_s3(
 
     # Sync files from S3 to Modal Volume so sandboxes can access them
     if key_or_prefix.endswith("/"):
-        response = s3.list_objects_v2(Bucket=bucket, Prefix=key_or_prefix)
+        response = await asyncio.to_thread(
+            s3.list_objects_v2, Bucket=bucket, Prefix=key_or_prefix
+        )
         for obj in response.get("Contents", []):
             obj_key = obj["Key"]
             filename = obj_key.split("/")[-1]
             if not filename:
                 continue
-            data = s3.get_object(Bucket=bucket, Key=obj_key)["Body"].read()
+
+            def _download_obj(k=obj_key):
+                return s3.get_object(Bucket=bucket, Key=k)["Body"].read()
+
+            data = await asyncio.to_thread(_download_obj)
             with tempfile.NamedTemporaryFile(delete=False) as tmp:
                 tmp.write(data)
                 tmp_path = tmp.name
@@ -163,7 +173,11 @@ async def create_experiment_from_s3(
                 os.unlink(tmp_path)
     else:
         filename = key_or_prefix.split("/")[-1]
-        data = s3.get_object(Bucket=bucket, Key=key_or_prefix)["Body"].read()
+
+        def _download_single():
+            return s3.get_object(Bucket=bucket, Key=key_or_prefix)["Body"].read()
+
+        data = await asyncio.to_thread(_download_single)
         with tempfile.NamedTemporaryFile(delete=False) as tmp:
             tmp.write(data)
             tmp_path = tmp.name
