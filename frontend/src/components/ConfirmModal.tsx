@@ -54,7 +54,12 @@ export default function ConfirmModal({
   const btnBg = isDanger ? 'bg-red-600 hover:bg-red-700' : 'bg-amber-600 hover:bg-amber-700';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="confirm-modal-title"
+    >
       <div
         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
         onClick={loading ? undefined : onClose}
@@ -64,7 +69,9 @@ export default function ConfirmModal({
           <div className={`p-2.5 rounded-full ${iconBg}`}>
             <Icon className={`w-5 h-5 ${iconColor}`} />
           </div>
-          <h2 className="text-lg font-semibold text-white">{title}</h2>
+          <h2 id="confirm-modal-title" className="text-lg font-semibold text-white">
+            {title}
+          </h2>
         </div>
         <p className="text-sm text-gray-300 mb-1">{description}</p>
         {secondaryDescription && (

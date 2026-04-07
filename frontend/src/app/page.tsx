@@ -177,7 +177,7 @@ export default function HomePage() {
             <a href="/" className="flex items-center rounded-lg transition-colors hover:opacity-90">
               <img src="/logo-with-text.png" alt="Trainable" className="h-8 sm:h-9 w-auto" />
             </a>
-            <nav className="flex items-center space-x-1 sm:space-x-4">
+            <nav aria-label="Main navigation" className="flex items-center space-x-1 sm:space-x-4">
               <a
                 href="/"
                 className="text-white bg-surface-hover px-2 sm:px-3 py-1.5 sm:py-2 text-sm font-medium rounded-lg transition-colors"
@@ -200,9 +200,15 @@ export default function HomePage() {
                 <p className="mt-1 text-sm text-gray-400">Manage and monitor your ML experiments</p>
               </div>
               <div className="flex items-center gap-2">
-                <div className="flex items-center bg-surface-elevated rounded-lg border border-surface-border p-0.5">
+                <div
+                  className="flex items-center bg-surface-elevated rounded-lg border border-surface-border p-0.5"
+                  role="group"
+                  aria-label="View mode"
+                >
                   <button
                     onClick={() => setViewMode('cards')}
+                    aria-label="Card view"
+                    aria-pressed={viewMode === 'cards'}
                     className={`p-1.5 rounded-md transition-colors ${viewMode === 'cards' ? 'bg-surface-hover text-white' : 'text-gray-500 hover:text-gray-300'}`}
                     title="Card view"
                   >
@@ -210,6 +216,8 @@ export default function HomePage() {
                   </button>
                   <button
                     onClick={() => setViewMode('table')}
+                    aria-label="Table view"
+                    aria-pressed={viewMode === 'table'}
                     className={`p-1.5 rounded-md transition-colors ${viewMode === 'table' ? 'bg-surface-hover text-white' : 'text-gray-500 hover:text-gray-300'}`}
                     title="Table view"
                   >
@@ -396,10 +404,11 @@ export default function HomePage() {
                   Showing {page * PAGE_SIZE + 1}\u2013
                   {Math.min((page + 1) * PAGE_SIZE, experiments.length)} of {experiments.length}
                 </span>
-                <div className="flex items-center gap-1">
+                <nav aria-label="Pagination" className="flex items-center gap-1">
                   <button
                     onClick={() => setPage((p) => Math.max(0, p - 1))}
                     disabled={page === 0}
+                    aria-label="Previous page"
                     className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-surface-hover disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-gray-400 transition-colors"
                   >
                     <ChevronLeft className="w-4 h-4" />
@@ -408,6 +417,8 @@ export default function HomePage() {
                     <button
                       key={i}
                       onClick={() => setPage(i)}
+                      aria-label={`Page ${i + 1}`}
+                      aria-current={i === page ? 'page' : undefined}
                       className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors ${
                         i === page
                           ? 'bg-primary-600 text-white'
@@ -420,11 +431,12 @@ export default function HomePage() {
                   <button
                     onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
                     disabled={page >= totalPages - 1}
+                    aria-label="Next page"
                     className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-surface-hover disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-gray-400 transition-colors"
                   >
                     <ChevronRight className="w-4 h-4" />
                   </button>
-                </div>
+                </nav>
               </div>
             )}
           </div>

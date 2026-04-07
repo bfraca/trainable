@@ -95,7 +95,16 @@ function ToolCard({ event }: { event: ToolStartEvent | ToolEndEvent }) {
     <div className="animate-fade-in border border-surface-border rounded-lg overflow-hidden mx-1">
       <div
         className="flex items-center gap-2 px-3 py-2 bg-neutral-800/80 cursor-pointer select-none"
+        role="button"
+        tabIndex={0}
+        aria-expanded={!collapsed}
         onClick={() => setCollapsed((prev) => !prev)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            setCollapsed((prev) => !prev);
+          }
+        }}
       >
         {isStart ? (
           <Loader2 className="w-3.5 h-3.5 text-amber-400 animate-spin" />
@@ -189,7 +198,9 @@ export default function ChatPanel({
             case 'tool_end':
               return <ToolCard key={`ev-${i}`} event={event} />;
             case 'code_output':
-              return <CodeOutput key={`ev-${i}`} text={event.data.text} stream={event.data.stream} />;
+              return (
+                <CodeOutput key={`ev-${i}`} text={event.data.text} stream={event.data.stream} />
+              );
             case 'agent_message':
               return (
                 <div key={`ev-${i}`} className="flex gap-2.5 animate-fade-in">
@@ -237,7 +248,11 @@ export default function ChatPanel({
 
         {/* Running indicator */}
         {isRunning && streamEvents.length === 0 && !streamingText && (
-          <div className="flex items-center gap-2 text-sm text-gray-500 py-2">
+          <div
+            className="flex items-center gap-2 text-sm text-gray-500 py-2"
+            role="status"
+            aria-live="polite"
+          >
             <Loader2 className="w-4 h-4 animate-spin text-primary-500" />
             <span>Agent is thinking...</span>
           </div>
@@ -251,6 +266,7 @@ export default function ChatPanel({
         <div className="flex items-center gap-1 bg-surface-elevated border border-surface-border rounded-full px-2 py-1.5 focus-within:border-primary-500 transition-colors">
           <button
             type="button"
+            aria-label="Attach file"
             className="p-2 rounded-full hover:bg-neutral-700 transition-colors text-gray-400 hover:text-gray-300 shrink-0"
             title="Attach file"
           >
@@ -261,12 +277,14 @@ export default function ChatPanel({
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="Ask anything"
+            aria-label="Chat message"
             className="flex-1 bg-transparent text-white text-sm placeholder-gray-500 focus:outline-none py-1.5"
           />
           {isRunning && !input.trim() && onStop ? (
             <button
               type="button"
               onClick={onStop}
+              aria-label="Stop agent"
               className="p-2 bg-red-600 hover:bg-red-700 rounded-full transition-colors shrink-0"
               title="Stop agent"
             >
@@ -276,6 +294,7 @@ export default function ChatPanel({
             <button
               type="submit"
               disabled={!input.trim()}
+              aria-label="Send message"
               className="p-2 bg-primary-600 hover:bg-primary-700 disabled:opacity-30 rounded-full transition-colors shrink-0"
             >
               <Send className="w-4 h-4 text-white" />
