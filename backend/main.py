@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from config import settings
 from db import init_db
 from errors import generic_exception_handler
+from middleware.auth import APIKeyMiddleware
 from routers import data_explorer, experiments, files, s3_browser, sessions, stream
 from services.s3_client import get_s3_client
 
@@ -45,6 +46,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Trainable v2", lifespan=lifespan)
 app.add_exception_handler(Exception, generic_exception_handler)
 
+app.add_middleware(APIKeyMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,

@@ -49,6 +49,9 @@ class Settings(BaseSettings):
     sse_keepalive_seconds: float = 30.0
     broadcaster_max_queue_size: int = 1000
 
+    # -- Authentication --
+    api_key: str = ""  # Set API_KEY env var to enable auth; empty = open access
+
     # -- CORS --
     cors_origins: list[str] = ["*"]
 
