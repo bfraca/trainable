@@ -9,15 +9,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from config import settings
 from db import init_db
 from errors import generic_exception_handler
+from logging_config import setup_logging
 from middleware.auth import APIKeyMiddleware
 from middleware.rate_limit import setup_rate_limiting
+from middleware.request_logging import RequestLoggingMiddleware
 from routers import data_explorer, experiments, files, s3_browser, sessions, stream
 from services.s3_client import get_s3_client
 
-logging.basicConfig(
-    level=getattr(logging, settings.log_level.upper(), logging.INFO),
-    format="%(asctime)s %(name)s %(levelname)s %(message)s",
-)
+setup_logging(level=settings.log_level, fmt=settings.log_format)
 logger = logging.getLogger(__name__)
 
 
@@ -56,6 +55,7 @@ app = FastAPI(
 )
 app.add_exception_handler(Exception, generic_exception_handler)
 
+app.add_middleware(RequestLoggingMiddleware)
 app.add_middleware(APIKeyMiddleware)
 app.add_middleware(
     CORSMiddleware,
@@ -65,7 +65,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 # Rate limiting must be added last so it becomes the outermost middleware.
-# Execution order: SlowAPI → CORS → APIKey → route.
+# Execution order: SlowAPI → CORS → APIKey → RequestLogging → route.
 # This ensures all requests (including unauthenticated ones) are
 # rate-limited before reaching APIKeyMiddleware.
 setup_rate_limiting(app)
