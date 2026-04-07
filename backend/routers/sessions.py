@@ -1,19 +1,19 @@
 """Session lifecycle, messages, and stage orchestration routes."""
 
-from __future__ import annotations
-
 import asyncio
 import logging
 import traceback
 import uuid
 from typing import Optional
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from config import settings
 from db import async_session, get_db
+from middleware.rate_limit import limiter
 from models import Artifact, Experiment, Message, Metric
 from models import Session as SessionModel
 from schemas import MessageCreate, StageStart
@@ -177,7 +177,9 @@ async def abort_session(session_id: str, db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/sessions/{session_id}/stages/{stage}/start")
+@limiter.limit(settings.rate_limit_agent_start)
 async def start_stage(
+    request: Request,
     session_id: str,
     stage: str,
     body: StageStart = StageStart(),

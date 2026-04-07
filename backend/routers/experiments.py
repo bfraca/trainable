@@ -8,13 +8,14 @@ import tempfile
 import uuid
 from typing import List
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from config import settings
 from db import get_db
+from middleware.rate_limit import limiter
 from models import Experiment
 from models import Session as SessionModel
 from services.s3_client import get_s3_client
@@ -36,7 +37,9 @@ async def list_experiments(db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/experiments")
+@limiter.limit(settings.rate_limit_upload)
 async def create_experiment(
+    request: Request,
     name: str = Form(...),
     description: str = Form(""),
     instructions: str = Form(""),

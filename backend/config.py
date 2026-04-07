@@ -52,6 +52,11 @@ class Settings(BaseSettings):
     # -- Authentication --
     api_key: str = ""  # Set API_KEY env var to enable auth; empty = open access
 
+    # -- Rate limiting --
+    rate_limit_default: str = "60/minute"
+    rate_limit_agent_start: str = "5/minute"
+    rate_limit_upload: str = "10/minute"
+
     # -- CORS --
     cors_origins: list[str] = ["*"]
 
