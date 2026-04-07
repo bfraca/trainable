@@ -79,9 +79,9 @@ export default function CreateModal({ onClose, onCreated }: CreateModalProps) {
   // Close on Escape
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && phase === 'form') onClose();
+      if (e.key === 'Escape' && phase === 'form' && !showS3Browser) onClose();
     },
-    [onClose, phase],
+    [onClose, phase, showS3Browser],
   );
 
   useEffect(() => {
@@ -175,7 +175,8 @@ export default function CreateModal({ onClose, onCreated }: CreateModalProps) {
         className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4"
         role="dialog"
         aria-modal="true"
-        aria-labelledby="create-modal-title"
+        aria-labelledby={!isLoading ? 'create-modal-title' : undefined}
+        aria-label={isLoading ? 'New Experiment' : undefined}
       >
         <div
           className={`bg-surface-elevated border border-surface-border rounded-2xl w-full flex flex-col overflow-hidden transition-all duration-500 ease-in-out ${
