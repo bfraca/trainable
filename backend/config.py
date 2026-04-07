@@ -71,6 +71,7 @@ class Settings(BaseSettings):
 
     # -- Logging --
     log_level: str = "INFO"
+    log_format: str = "text"  # "text" for human-readable, "json" for structured JSON
 
 
 settings = Settings()
